@@ -1,26 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --navy: #060534;
+  --navy-light: #0B0B3B;
+  --navy-mid: #1A1A5C;
+  --navy-hover: #0e0e4a;
+  --offwhite: #FFFEF3;
+  --tusk: #FFFEE9;
+  --cream: #F7F7FD;
+  --white: #FFFFFF;
+  --border: #E2E0D8;
+  --border-light: #EEECE6;
+  --text: #060534;
+  --text-sec: #4A4A6A;
+  --text-mut: #8A8AA0;
+  --accent: #D4A853;
+  --accent-light: #FDF6E3;
+  --success: #1B7A4E;
+  --success-light: #E6F5ED;
+  --danger: #C53030;
+  --danger-light: #FDE8E8;
+  --blue: #2563EB;
+  --blue-light: #EFF6FF;
+  --purple: #7c3aed;
+  --purple-light: #f3e8ff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-navy: var(--navy);
+  --color-navy-light: var(--navy-light);
+  --color-navy-mid: var(--navy-mid);
+  --color-navy-hover: var(--navy-hover);
+  --color-offwhite: var(--offwhite);
+  --color-tusk: var(--tusk);
+  --color-cream: var(--cream);
+  --color-border: var(--border);
+  --color-border-light: var(--border-light);
+  --color-text: var(--text);
+  --color-text-sec: var(--text-sec);
+  --color-text-mut: var(--text-mut);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-hkr-success: var(--success);
+  --color-success-light: var(--success-light);
+  --color-danger: var(--danger);
+  --color-danger-light: var(--danger-light);
+  --color-hkr-blue: var(--blue);
+  --color-blue-light: var(--blue-light);
+  --color-hkr-purple: var(--purple);
+  --color-purple-light: var(--purple-light);
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: 'DM Serif Display', serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--offwhite);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
+
+h1, h2, h3 { font-family: 'DM Serif Display', serif; font-weight: 400; }
+
+input, textarea, select, button { font-family: 'DM Sans', sans-serif; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+
+.anim-up { animation: fadeUp 0.4s ease-out; }
+.anim-fade { animation: fadeIn 0.3s ease-out; }
+.anim-slide { animation: slideIn 0.2s ease-out; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
