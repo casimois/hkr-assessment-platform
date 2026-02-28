@@ -227,6 +227,10 @@ export default function AssessmentsPage() {
         <h1 className="text-2xl" style={{ fontFamily: 'var(--font-serif, "DM Serif Display", serif)' }}>
           Assessments
         </h1>
+        <Link href="/admin/assessments/new" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Assessment
+        </Link>
       </div>
 
       {/* filter row */}
@@ -291,7 +295,7 @@ export default function AssessmentsPage() {
           return (
             <Link
               key={a.id}
-              href="/admin/assessments"
+              href={`/admin/assessments/${a.id}/edit`}
               className="block no-underline"
               style={{ color: 'inherit' }}
             >

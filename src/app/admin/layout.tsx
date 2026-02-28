@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 /* ------------------------------------------------------------------ */
 /*  SVG icon components for sidebar nav                                */
@@ -101,11 +102,18 @@ const navSections: NavSection[] = [
 const pageTitles: Record<string, string> = {
   '/admin/dashboard': 'Dashboard',
   '/admin/assessments': 'Assessments',
+  '/admin/assessments/new': 'New Assessment',
   '/admin/results': 'Results',
   '/admin/candidates': 'Candidates',
   '/admin/projects': 'Projects',
   '/admin/settings': 'Settings',
 };
+
+function getPageTitle(pathname: string): string {
+  if (pageTitles[pathname]) return pageTitles[pathname];
+  if (pathname.includes('/assessments/') && pathname.includes('/edit')) return 'Edit Assessment';
+  return 'Admin';
+}
 
 /* ------------------------------------------------------------------ */
 /*  Layout component                                                   */
@@ -113,8 +121,29 @@ const pageTitles: Record<string, string> = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading, signOut } = useAuth();
 
-  const currentTitle = pageTitles[pathname] ?? 'Admin';
+  const currentTitle = getPageTitle(pathname);
+
+  // Derive user display info
+  const userEmail = user?.email ?? 'admin@hkr.team';
+  const userName = user?.user_metadata?.full_name ?? userEmail.split('@')[0];
+  const userInitials = userName.split(/[\s.]+/).map((w: string) => w[0]?.toUpperCase()).join('').slice(0, 2);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--offwhite)' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid var(--border-light)', borderTopColor: 'var(--navy)', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.push('/login');
+    return null;
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
@@ -167,9 +196,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       display: 'flex',
                       alignItems: 'center',
                       gap: 10,
-                      padding: '9px 12px',
-                      borderRadius: 8,
-                      fontSize: 13.5,
+                      padding: '11px 14px',
+                      borderRadius: 10,
+                      fontSize: 14,
                       fontWeight: 500,
                       color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.55)',
                       background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
@@ -225,7 +254,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 flexShrink: 0,
               }}
             >
-              SA
+              {userInitials}
             </div>
             <div style={{ overflow: 'hidden' }}>
               <div
@@ -238,7 +267,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   textOverflow: 'ellipsis',
                 }}
               >
-                Sarah Anderson
+                {userName}
               </div>
               <div
                 style={{
@@ -246,25 +275,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   color: 'rgba(255,255,255,0.4)',
                 }}
               >
-                Super Admin
+                Admin
               </div>
             </div>
           </div>
 
-          {/* Exit admin link */}
-          <Link
-            href="/"
+          {/* Sign out button */}
+          <button
+            onClick={async () => { await signOut(); router.push('/login'); }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               padding: '8px 12px',
-              borderRadius: 8,
+              borderRadius: 10,
               fontSize: 13,
               fontWeight: 500,
               color: 'rgba(255,255,255,0.45)',
               textDecoration: 'none',
               transition: 'all 0.15s ease',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              fontFamily: "'DM Sans', sans-serif",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = 'rgba(255,255,255,0.85)';
@@ -276,8 +310,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center' }}>{icons.exit}</span>
-            Exit Admin
-          </Link>
+            Sign Out
+          </button>
         </div>
       </aside>
 

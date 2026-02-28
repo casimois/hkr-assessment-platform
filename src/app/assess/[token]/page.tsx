@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { supabase, type Section, type Question } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured, type Section, type Question } from '@/lib/supabase'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -198,10 +198,62 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /*  Timer                                                            */
   /* ---------------------------------------------------------------- */
 
+  /* ---------------------------------------------------------------- */
+  /*  Score calculation + save                                         */
+  /* ---------------------------------------------------------------- */
+
+  const scoreAndSave = useCallback(async (finalAnswers: Record<string, unknown>) => {
+    const sections = submission?.assessments?.sections ?? FALLBACK_ASSESSMENT.sections
+    let earned = 0
+    let possible = 0
+
+    for (const sec of sections) {
+      for (const q of sec.questions) {
+        possible += q.points
+        const ans = finalAnswers[q.id]
+        if (ans === undefined || ans === null || ans === '') continue
+
+        if (q.type === 'multiple_choice' && q.correct !== undefined) {
+          if (ans === q.correct) earned += q.points
+        } else if (q.type === 'fill_blank' && q.accepted_answers) {
+          const ansStr = String(ans).trim().toLowerCase()
+          if (q.accepted_answers.some(a => a.toLowerCase() === ansStr)) earned += q.points
+        } else if (q.type === 'ranking' && q.items) {
+          const ansArr = ans as string[]
+          const isCorrect = Array.isArray(ansArr) && ansArr.every((item, i) => item === q.items![i])
+          if (isCorrect) earned += q.points
+        }
+        // Written questions are not auto-scored
+      }
+    }
+
+    const scorePercent = possible > 0 ? Math.round((earned / possible) * 100) : 0
+    const passed = scorePercent >= 70
+
+    // Save to Supabase
+    if (isSupabaseConfigured && submission && submission.id !== 'fallback-submission') {
+      try {
+        await supabase
+          .from('submissions')
+          .update({
+            answers: finalAnswers,
+            score: scorePercent,
+            passed,
+            status: 'completed' as const,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', submission.id)
+      } catch (err) {
+        console.error('Failed to save submission:', err)
+      }
+    }
+  }, [submission])
+
   const handleAutoSubmit = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
+    scoreAndSave(answers)
     setScreen('done')
-  }, [])
+  }, [answers, scoreAndSave])
 
   useEffect(() => {
     if (screen !== 'quiz') return
@@ -269,6 +321,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   function handleSubmit() {
     if (timerRef.current) clearInterval(timerRef.current)
     setShowSubmitModal(false)
+    scoreAndSave(answers)
     setScreen('done')
   }
 
