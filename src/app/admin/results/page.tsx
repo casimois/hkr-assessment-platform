@@ -16,14 +16,6 @@ type ResultRow = {
   date: string;
 };
 
-const FALLBACK_DATA: ResultRow[] = [
-  { id: "1", candidateName: "Maria Santos", candidateEmail: "maria.santos@email.com", assessment: "English Proficiency", type: "scoring", project: "Client Onboarding", status: "completed", score: 85, passed: true, date: "Feb 27, 2026" },
-  { id: "2", candidateName: "James Chen", candidateEmail: "james.chen@email.com", assessment: "Cultural Fit", type: "open", project: "Talent Pipeline", status: "completed", score: null, passed: null, date: "Feb 27, 2026" },
-  { id: "3", candidateName: "Tom Wilson", candidateEmail: "tom.wilson@email.com", assessment: "English Proficiency", type: "scoring", project: "Client Onboarding", status: "completed", score: 54, passed: false, date: "Feb 26, 2026" },
-  { id: "4", candidateName: "Aisha Patel", candidateEmail: "aisha.patel@email.com", assessment: "English Proficiency", type: "scoring", project: "Client Onboarding", status: "in_progress", score: null, passed: null, date: "Feb 27, 2026" },
-  { id: "5", candidateName: "Lena Kovacs", candidateEmail: "lena.kovacs@email.com", assessment: "English Proficiency", type: "scoring", project: "Talent Pipeline", status: "expired", score: null, passed: null, date: "Feb 25, 2026" },
-];
-
 function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
@@ -31,7 +23,7 @@ function getInitials(name: string) {
 function formatStatus(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
 
 export default function ResultsPage() {
-  const [results, setResults] = useState<ResultRow[]>(FALLBACK_DATA);
+  const [results, setResults] = useState<ResultRow[]>([]);
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");

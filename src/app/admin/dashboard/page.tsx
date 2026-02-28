@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 /* ------------------------------------------------------------------ */
@@ -34,28 +35,15 @@ interface ActiveAssessment {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Hardcoded fallback data (matches prototype)                        */
+/*  Default empty stats                                                */
 /* ------------------------------------------------------------------ */
 
-const FALLBACK_STATS: StatCard[] = [
-  { label: 'Tests Sent', value: '247', subtitle: '+18 this week' },
-  { label: 'Open Rate', value: '78%', subtitle: '193 of 247 opened' },
-  { label: 'Completion', value: '64%', subtitle: '158 completed' },
-  { label: 'Avg Score', value: '72%', subtitle: 'Across all tests' },
-  { label: 'Pass Rate', value: '61%', subtitle: '96 of 158 passed' },
-]
-
-const FALLBACK_ACTIVITY: ActivityItem[] = [
-  { id: '1', initials: 'MS', name: 'Maria Santos', quiz: 'English Proficiency', date: 'Today, 2:14 PM', status: 'passed', score: '85%' },
-  { id: '2', initials: 'JC', name: 'James Chen', quiz: 'Cultural Fit Assessment', date: 'Today, 11:30 AM', status: 'completed' },
-  { id: '3', initials: 'TW', name: 'Tom Wilson', quiz: 'English Proficiency', date: 'Yesterday, 4:45 PM', status: 'failed', score: '54%' },
-  { id: '4', initials: 'AP', name: 'Aisha Patel', quiz: 'English Proficiency', date: 'Yesterday, 3:10 PM', status: 'in_progress' },
-]
-
-const FALLBACK_ASSESSMENTS: ActiveAssessment[] = [
-  { id: '1', icon: '\u{1F4DD}', title: 'English Proficiency', role: 'All Roles', sent: 142, type: 'scoring', avgScore: '72%' },
-  { id: '2', icon: '\u{1F91D}', title: 'Cultural Fit Assessment', role: 'All Roles', sent: 68, type: 'open' },
-  { id: '3', icon: '\u{1F4BB}', title: 'Technical Assessment', role: 'Engineering', sent: 37, type: 'scoring', avgScore: '68%' },
+const EMPTY_STATS: StatCard[] = [
+  { label: 'Tests Sent', value: '0', subtitle: 'No tests sent yet' },
+  { label: 'Open Rate', value: '0%', subtitle: '0 of 0 opened' },
+  { label: 'Completion', value: '0%', subtitle: '0 completed' },
+  { label: 'Avg Score', value: '0%', subtitle: 'Across all tests' },
+  { label: 'Pass Rate', value: '0%', subtitle: '0 of 0 passed' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -63,9 +51,9 @@ const FALLBACK_ASSESSMENTS: ActiveAssessment[] = [
 /* ------------------------------------------------------------------ */
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<StatCard[]>(FALLBACK_STATS)
-  const [activity, setActivity] = useState<ActivityItem[]>(FALLBACK_ACTIVITY)
-  const [assessments, setAssessments] = useState<ActiveAssessment[]>(FALLBACK_ASSESSMENTS)
+  const [stats, setStats] = useState<StatCard[]>(EMPTY_STATS)
+  const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [assessments, setAssessments] = useState<ActiveAssessment[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -127,10 +115,10 @@ export default function DashboardPage() {
           )
         }
 
-        if (allAssessments && allAssessments.length > 0 && submissions) {
+        if (allAssessments && allAssessments.length > 0) {
           setAssessments(
             allAssessments.map((a: Record<string, unknown>) => {
-              const subs = submissions.filter((s: Record<string, unknown>) => s.assessment_id === a.id)
+              const subs = submissions?.filter((s: Record<string, unknown>) => s.assessment_id === a.id) ?? []
               const scored = subs.filter((s: Record<string, unknown>) => s.score !== null && s.score !== undefined)
               const avg = scored.length
                 ? Math.round(scored.reduce((sum: number, s: Record<string, unknown>) => sum + ((s.score as number) ?? 0), 0) / scored.length)
@@ -177,7 +165,7 @@ export default function DashboardPage() {
     <div className="anim-up">
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26, fontWeight: 400, color: 'var(--navy)', marginBottom: 4 }}>Dashboard</h1>
+        <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Dashboard</h1>
         <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Overview of assessment activity and results</p>
       </div>
 
@@ -186,9 +174,9 @@ export default function DashboardPage() {
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="card card-pad">
-                <div style={{ width: 80, height: 12, marginBottom: 12, background: 'var(--cream)', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
-                <div style={{ width: 60, height: 32, marginBottom: 10, background: 'var(--cream)', borderRadius: 6 }} />
-                <div style={{ width: 100, height: 10, background: 'var(--cream)', borderRadius: 6 }} />
+                <div className="skeleton" style={{ width: 80, height: 12, marginBottom: 12 }} />
+                <div className="skeleton" style={{ width: 60, height: 32, marginBottom: 10 }} />
+                <div className="skeleton" style={{ width: 100, height: 10 }} />
               </div>
             ))
           : stats.map((s, i) => (
@@ -208,34 +196,48 @@ export default function DashboardPage() {
         {/* Recent Activity */}
         <div className="card card-pad">
           <div style={{ fontFamily: "'DM Serif Display', serif", fontWeight: 400, fontSize: 18, color: 'var(--navy)', marginBottom: 20 }}>Recent Activity</div>
-          {activity.map((item) => (
-            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--border-light)' }}>
-              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--tusk)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: 'var(--navy)', flexShrink: 0 }}>{item.initials}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 2 }}>{item.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-mut)' }}><span style={{ color: 'var(--text-sec)' }}>{item.quiz}</span> &middot; {item.date}</div>
-              </div>
-              {statusPill(item.status, item.score)}
+          {activity.length === 0 && !loading ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-mut)', fontSize: 14 }}>
+              <p style={{ marginBottom: 12 }}>No activity yet.</p>
+              <Link href="/admin/candidates" className="btn btn-primary btn-sm">Invite Your First Candidate</Link>
             </div>
-          ))}
+          ) : (
+            activity.map((item) => (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--tusk)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: 'var(--navy)', flexShrink: 0 }}>{item.initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 2 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-mut)' }}><span style={{ color: 'var(--text-sec)' }}>{item.quiz}</span> &middot; {item.date}</div>
+                </div>
+                {statusPill(item.status, item.score)}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Active Assessments */}
         <div className="card card-pad">
           <div style={{ fontFamily: "'DM Serif Display', serif", fontWeight: 400, fontSize: 18, color: 'var(--navy)', marginBottom: 20 }}>Active Assessments</div>
-          {assessments.map((a) => (
-            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--border-light)' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--cream)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{a.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 2 }}>{a.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-mut)' }}>{a.role} &middot; {a.sent} sent</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                {typePill(a.type)}
-                {a.avgScore && <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: 'var(--navy)' }}>{a.avgScore}</div>}
-              </div>
+          {assessments.length === 0 && !loading ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-mut)', fontSize: 14 }}>
+              <p style={{ marginBottom: 12 }}>No active assessments.</p>
+              <Link href="/admin/assessments/new" className="btn btn-primary btn-sm">Create Your First Assessment</Link>
             </div>
-          ))}
+          ) : (
+            assessments.map((a) => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--cream)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{a.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 2 }}>{a.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-mut)' }}>{a.role} &middot; {a.sent} sent</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                  {typePill(a.type)}
+                  {a.avgScore && <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: 'var(--navy)' }}>{a.avgScore}</div>}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

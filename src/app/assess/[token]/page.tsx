@@ -7,9 +7,9 @@ import { supabase, isSupabaseConfigured, type Section, type Question } from '@/l
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type Screen = 'identify' | 'welcome' | 'quiz' | 'done'
+type Screen = 'identify' | 'welcome' | 'quiz' | 'done' | 'error'
 
-interface FallbackAssessment {
+interface AssessmentData {
   title: string
   role: string
   time_limit: number
@@ -21,72 +21,9 @@ interface SubmissionData {
   token: string
   status: string
   answers: Record<string, unknown>
-  assessments: FallbackAssessment
+  assessments: AssessmentData
   candidates: { name: string; email: string }
 }
-
-/* ------------------------------------------------------------------ */
-/*  Hardcoded fallback data                                            */
-/* ------------------------------------------------------------------ */
-
-const FALLBACK_ASSESSMENT: FallbackAssessment = {
-  title: 'English Proficiency Assessment',
-  role: 'Project Manager',
-  time_limit: 20,
-  sections: [
-    {
-      title: 'Reading & Grammar',
-      questions: [
-        {
-          id: 'q1',
-          type: 'multiple_choice',
-          text: 'Which sentence is grammatically correct?',
-          options: [
-            "She don't have any experience.",
-            "She doesn't have any experience.",
-            "She don't has any experience.",
-            "She do not has any experience.",
-          ],
-          correct: 1,
-          points: 10,
-          weight: 1,
-        },
-        {
-          id: 'q2',
-          type: 'fill_blank',
-          text: 'Complete: "The meeting was _____ due to unforeseen circumstances."',
-          accepted_answers: ['cancelled', 'postponed'],
-          points: 10,
-          weight: 1,
-        },
-        {
-          id: 'q3',
-          type: 'ranking',
-          text: 'Rank these email components in the correct order:',
-          items: ['Subject line', 'Greeting', 'Body', 'Closing', 'Signature'],
-          points: 10,
-          weight: 1,
-        },
-      ],
-    },
-    {
-      title: 'Writing',
-      questions: [
-        {
-          id: 'q4',
-          type: 'written',
-          text: 'Write a professional email to a client informing them of a project delay.',
-          min_words: 50,
-          max_words: 300,
-          points: 20,
-          weight: 1,
-        },
-      ],
-    },
-  ],
-}
-
-const FALLBACK_CANDIDATE = { name: 'Maria Santos', email: 'maria.s@company.com' }
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -163,19 +100,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
         setIdentifyEmail(data.candidates?.email ?? '')
         setSecondsLeft((data.assessments?.time_limit ?? 20) * 60)
       } catch {
-        /* fallback to hardcoded data */
-        const fallback: SubmissionData = {
-          id: 'fallback-submission',
-          token: token,
-          status: 'pending',
-          answers: {},
-          assessments: FALLBACK_ASSESSMENT,
-          candidates: FALLBACK_CANDIDATE,
-        }
-        setSubmission(fallback)
-        setIdentifyName(FALLBACK_CANDIDATE.name)
-        setIdentifyEmail(FALLBACK_CANDIDATE.email)
-        setSecondsLeft(FALLBACK_ASSESSMENT.time_limit * 60)
+        setScreen('error')
       } finally {
         setLoading(false)
       }
@@ -187,7 +112,8 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /*  Derived data                                                     */
   /* ---------------------------------------------------------------- */
 
-  const assessment = submission?.assessments ?? FALLBACK_ASSESSMENT
+  const defaultAssessment: AssessmentData = { title: '', role: '', time_limit: 20, sections: [] }
+  const assessment = submission?.assessments ?? defaultAssessment
   const allQuestions = getAllQuestions(assessment.sections)
   const totalPoints = getTotalPoints(assessment.sections)
   const totalQuestions = allQuestions.length
@@ -203,7 +129,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /* ---------------------------------------------------------------- */
 
   const scoreAndSave = useCallback(async (finalAnswers: Record<string, unknown>) => {
-    const sections = submission?.assessments?.sections ?? FALLBACK_ASSESSMENT.sections
+    const sections = submission?.assessments?.sections ?? []
     let earned = 0
     let possible = 0
 
@@ -345,6 +271,35 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
         `}</style>
         <div className="assess-loading anim-fade">Loading assessment...</div>
       </>
+    )
+  }
+
+  /* ================================================================ */
+  /*  SCREEN: Error                                                    */
+  /* ================================================================ */
+
+  if (screen === 'error') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--offwhite)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+        <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', borderRadius: 20, padding: '56px 44px', width: '100%', maxWidth: 520, textAlign: 'center' }} className="anim-up">
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+          </div>
+          <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26, color: 'var(--navy)', marginBottom: 8 }}>Assessment Not Found</h1>
+          <p style={{ fontSize: 14, color: 'var(--text-mut)', lineHeight: 1.5, marginBottom: 32 }}>
+            This assessment link is invalid or has expired. Please contact your recruiter for a new link.
+          </p>
+          <a href="/" style={{ textDecoration: 'none' }}>
+            <button style={{ padding: '14px 32px', background: 'var(--navy)', color: 'var(--offwhite)', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+              Back to Home
+            </button>
+          </a>
+        </div>
+      </div>
     )
   }
 

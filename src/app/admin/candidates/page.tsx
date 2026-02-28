@@ -16,20 +16,12 @@ type CandidateRow = {
 
 type AssessmentOption = { id: string; title: string };
 
-const FALLBACK_DATA: CandidateRow[] = [
-  { id: "1", name: "Maria Santos", email: "maria.santos@email.com", source: "lever", testsCount: 2, latestResult: "English Proficiency \u2014 85%" },
-  { id: "2", name: "James Chen", email: "james.chen@email.com", source: "manual", testsCount: 1, latestResult: "Cultural Fit \u2014 completed" },
-  { id: "3", name: "Aisha Patel", email: "aisha.patel@email.com", source: "link", testsCount: 1, latestResult: "English Proficiency \u2014 in progress" },
-  { id: "4", name: "Tom Wilson", email: "tom.wilson@email.com", source: "lever", testsCount: 1, latestResult: "English Proficiency \u2014 54%" },
-  { id: "5", name: "Lena Kovacs", email: "lena.kovacs@email.com", source: "lever", testsCount: 1, latestResult: "English Proficiency \u2014 expired" },
-];
-
 function getInitials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
 export default function CandidatesPage() {
-  const [candidates, setCandidates] = useState<CandidateRow[]>(FALLBACK_DATA);
+  const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [assessments, setAssessments] = useState<AssessmentOption[]>([]);
   const [search, setSearch] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -156,7 +148,14 @@ export default function CandidatesPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ padding: '48px 20px', textAlign: 'center', fontSize: 14, color: 'var(--text-mut)' }}>No candidates match your search.</td>
+                  <td colSpan={4} style={{ padding: '48px 20px', textAlign: 'center', fontSize: 14, color: 'var(--text-mut)' }}>
+                    {search ? 'No candidates match your search.' : (
+                      <>
+                        <p style={{ marginBottom: 16 }}>No candidates yet. Use Invite or Generate Link to add your first candidate.</p>
+                        <button className="btn btn-primary btn-sm" onClick={() => setInviteOpen(true)}>Invite Candidate</button>
+                      </>
+                    )}
+                  </td>
                 </tr>
               )}
             </tbody>

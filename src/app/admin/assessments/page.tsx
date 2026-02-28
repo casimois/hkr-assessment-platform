@@ -7,48 +7,6 @@ import { supabase, type Assessment, type Section } from '@/lib/supabase'
 /* ---------- types ---------- */
 type AssessmentWithProject = Assessment & { projects: { name: string } | null }
 
-/* ---------- fallback seed data ---------- */
-const FALLBACK: AssessmentWithProject[] = [
-  {
-    id: '1', title: 'English Proficiency Assessment', description: null, type: 'scoring', status: 'active',
-    project_id: 'p1', role: 'Project Manager', time_limit: 30, pass_threshold: 70,
-    sections: [{ title: 'Section 1', questions: [
-      { id: 'q1', type: 'multiple_choice', text: '', points: 10, weight: 1 },
-      { id: 'q2', type: 'fill_blank', text: '', points: 10, weight: 1 },
-      { id: 'q3', type: 'written', text: '', points: 10, weight: 1 },
-      { id: 'q4', type: 'ranking', text: '', points: 10, weight: 1 },
-    ] }],
-    created_at: '', updated_at: '', projects: { name: 'Client Onboarding' }, _sent: 142, _avg: 72,
-  },
-  {
-    id: '2', title: 'Cultural Fit Interview', description: null, type: 'open', status: 'active',
-    project_id: 'p2', role: 'General', time_limit: 20, pass_threshold: null,
-    sections: [{ title: 'Section 1', questions: [
-      { id: 'q1', type: 'written', text: '', points: 10, weight: 1 },
-      { id: 'q2', type: 'written', text: '', points: 10, weight: 1 },
-      { id: 'q3', type: 'written', text: '', points: 10, weight: 1 },
-    ] }],
-    created_at: '', updated_at: '', projects: { name: 'Talent Pipeline' }, _sent: 68, _avg: null,
-  },
-  {
-    id: '3', title: 'Technical Assessment', description: null, type: 'scoring', status: 'draft',
-    project_id: 'p1', role: 'Developer', time_limit: 45, pass_threshold: 60,
-    sections: [
-      { title: 'Section 1', questions: [
-        { id: 'q1', type: 'multiple_choice', text: '', points: 10, weight: 1 },
-        { id: 'q2', type: 'multiple_choice', text: '', points: 10, weight: 1 },
-        { id: 'q3', type: 'fill_blank', text: '', points: 10, weight: 1 },
-      ] },
-      { title: 'Section 2', questions: [
-        { id: 'q4', type: 'written', text: '', points: 10, weight: 1 },
-        { id: 'q5', type: 'ranking', text: '', points: 10, weight: 1 },
-        { id: 'q6', type: 'multiple_choice', text: '', points: 10, weight: 1 },
-      ] },
-    ],
-    created_at: '', updated_at: '', projects: { name: 'Client Onboarding' }, _sent: 0, _avg: null,
-  },
-] as unknown as AssessmentWithProject[]
-
 /* ---------- helpers ---------- */
 function countQuestions(sections: Section[] | unknown): number {
   if (!Array.isArray(sections)) {
@@ -87,8 +45,7 @@ export default function AssessmentsPage() {
         }
         setStats(statMap)
       } catch {
-        setAssessments(FALLBACK)
-        setStats({ '1': { sent: 142, avg: 72 }, '2': { sent: 68, avg: null }, '3': { sent: 0, avg: null } })
+        /* empty state */
       } finally { setLoading(false) }
     }
     load()
@@ -157,7 +114,8 @@ export default function AssessmentsPage() {
       {!loading && filtered.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-mut)', fontSize: 14 }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
-          No assessments found.
+          <p style={{ marginBottom: 16 }}>No assessments yet. Create one to start evaluating candidates.</p>
+          <Link href="/admin/assessments/new" className="btn btn-primary btn-sm">Create First Assessment</Link>
         </div>
       )}
 

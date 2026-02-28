@@ -13,13 +13,8 @@ interface ProjectRow {
   assessment_count: number
 }
 
-const FALLBACK_PROJECTS: ProjectRow[] = [
-  { id: '1', name: 'Client Onboarding', description: 'Standard candidate assessments', client: 'Acme Corp', team: 'Recruiting', lever_tag: 'acme-onboard', assessment_count: 3 },
-  { id: '2', name: 'Talent Pipeline', description: 'General screening', client: 'TechStart', team: 'Engineering', lever_tag: null, assessment_count: 1 },
-]
-
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<ProjectRow[]>(FALLBACK_PROJECTS)
+  const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
