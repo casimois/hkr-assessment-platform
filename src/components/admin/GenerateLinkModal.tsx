@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 type Props = {
@@ -10,6 +10,13 @@ type Props = {
 
 export default function GenerateLinkModal({ isOpen, onClose, assessments }: Props) {
   const [assessmentId, setAssessmentId] = useState(assessments[0]?.id || '')
+
+  // Sync assessmentId when assessments load asynchronously
+  useEffect(() => {
+    if (!assessmentId && assessments.length > 0) {
+      setAssessmentId(assessments[0].id)
+    }
+  }, [assessments, assessmentId])
   const [generatedUrl, setGeneratedUrl] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
