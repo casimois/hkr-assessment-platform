@@ -182,7 +182,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div className="stats-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 28 }}>
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="card card-pad">

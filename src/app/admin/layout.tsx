@@ -160,7 +160,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }}
       >
         {/* Logo */}
-        <div style={{ padding: '24px 20px 16px' }}>
+        <div style={{ padding: '24px 24px 28px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://hkr.team/hubfs/Navy(spread)_vector.svg"
             alt="HKR Logo"
@@ -169,17 +170,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav sections */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navSections.map((section) => (
-            <div key={section.title} style={{ marginBottom: 24 }}>
+            <div key={section.title} style={{ marginBottom: 4 }}>
               <div
                 style={{
                   fontSize: 10,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'rgba(255,255,255,0.35)',
-                  padding: '0 8px 8px',
+                  letterSpacing: '0.1em',
+                  color: 'rgba(255,255,255,0.2)',
+                  padding: '16px 14px 6px',
                 }}
               >
                 {section.title}
@@ -195,7 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
+                      gap: 12,
                       padding: '11px 14px',
                       borderRadius: 10,
                       fontSize: 14,
