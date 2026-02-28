@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type ResultRow = {
@@ -23,6 +24,7 @@ function getInitials(name: string) {
 function formatStatus(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
 
 export default function ResultsPage() {
+  const router = useRouter();
   const [results, setResults] = useState<ResultRow[]>([]);
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -166,7 +168,7 @@ export default function ResultsPage() {
                   </td>
                   <td style={{ padding: '16px 20px', fontSize: 13, color: 'var(--text-mut)' }}>{row.date}</td>
                   <td style={{ padding: '16px 20px' }}>
-                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }}>View</button>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => router.push(`/admin/results/${row.id}`)}>View</button>
                   </td>
                 </tr>
               ))}

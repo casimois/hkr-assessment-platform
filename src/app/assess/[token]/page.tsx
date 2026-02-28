@@ -658,19 +658,10 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
             color: var(--text-sec);
             line-height: 1.6;
           }
-          .done-btn {
-            padding: 14px 32px;
-            background: var(--navy);
-            color: var(--offwhite);
-            border: none;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-          }
-          .done-btn:hover {
-            background: var(--navy-hover);
+          .done-footer {
+            font-size: 12px;
+            color: var(--text-mut);
+            margin-top: 8px;
           }
         `}</style>
 
@@ -694,9 +685,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
               </div>
             </div>
 
-            <a href="/" style={{ textDecoration: 'none' }}>
-              <button className="done-btn">Back to Platform</button>
-            </a>
+            <div className="done-footer">You may now close this window.</div>
           </div>
         </div>
       </>
