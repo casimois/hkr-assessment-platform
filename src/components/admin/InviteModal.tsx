@@ -23,6 +23,7 @@ export default function InviteModal({ isOpen, onClose, assessments }: Props) {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState('')
 
   if (!isOpen) return null
 
@@ -68,6 +69,9 @@ export default function InviteModal({ isOpen, onClose, assessments }: Props) {
         })
         if (res.ok) {
           setEmailSent(true)
+        } else {
+          const body = await res.json().catch(() => ({}))
+          setEmailError(body.error || 'Email delivery failed')
         }
       } catch {
         // Email failed but link was still created — that's ok
@@ -92,6 +96,7 @@ export default function InviteModal({ isOpen, onClose, assessments }: Props) {
     setGeneratedUrl('')
     setError('')
     setEmailSent(false)
+    setEmailError('')
     onClose()
   }
 
@@ -130,7 +135,9 @@ export default function InviteModal({ isOpen, onClose, assessments }: Props) {
 
             {!emailSent && (
               <div style={{ fontSize: 11, color: 'var(--text-mut)', marginTop: 4 }}>
-                Email could not be sent. Please share this link manually with {name}.
+                {emailError
+                  ? `Email failed: ${emailError}. Please share this link manually with ${name}.`
+                  : `Email could not be sent. Please share this link manually with ${name}.`}
               </div>
             )}
           </div>
