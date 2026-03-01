@@ -119,6 +119,13 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     if (!contentRef.current || !submission) return
     setExporting(true)
 
+    // Wait for React to render the export header (logo img), then wait for the logo to load
+    await new Promise(r => setTimeout(r, 100))
+    const logoImg = contentRef.current?.querySelector('img[alt="HKR Logo"]') as HTMLImageElement | null
+    if (logoImg && !logoImg.complete) {
+      await new Promise<void>(r => { logoImg.onload = () => r(); logoImg.onerror = () => r() })
+    }
+
     try {
       const html2canvas = (await import('html2canvas-pro')).default
       const canvas = await html2canvas(contentRef.current, {
@@ -265,7 +272,8 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       {/* Branded header for export */}
       {exporting && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border-light)' }}>
-          <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, fontWeight: 400, color: 'var(--navy)' }}>HKR.TEAM</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="https://hkr.team/hubfs/Navy(spread)_vector.svg" alt="HKR Logo" style={{ height: 22 }} />
           <div style={{ fontSize: 11, color: 'var(--text-mut)' }}>Assessment Report · {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
         </div>
       )}
