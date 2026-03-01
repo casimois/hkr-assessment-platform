@@ -100,6 +100,12 @@ function scoreQuestion(q: Question, answer: unknown): { earned: number; correct:
   return { earned: 0, correct: null }
 }
 
+/* ---------- shared inline style constants ---------- */
+const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--text-mut)', marginBottom: 8 }
+const METRIC: React.CSSProperties = { fontFamily: "'DM Serif Display', serif", fontSize: 32, fontWeight: 400, color: 'var(--navy)', lineHeight: 1.1, marginBottom: 6 }
+const SECTION_TITLE: React.CSSProperties = { fontFamily: "'DM Serif Display', serif", fontWeight: 400, fontSize: 18, color: 'var(--navy)', marginBottom: 20 }
+const SUB_TEXT: React.CSSProperties = { fontSize: 12, color: 'var(--text-mut)' }
+
 /* ---------- component ---------- */
 export default function SubmissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null)
@@ -112,7 +118,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       try {
         const { id } = await params
 
-        // Fetch this submission
         const { data, error: fetchErr } = await supabase
           .from('submissions')
           .select('*, assessments(*, projects(name)), candidates(name, email)')
@@ -122,7 +127,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         if (fetchErr || !data) throw fetchErr || new Error('Submission not found')
         setSubmission(data as unknown as SubmissionDetail)
 
-        // Fetch peer submissions for the same assessment
         const { data: peers } = await supabase
           .from('submissions')
           .select('score')
@@ -170,12 +174,11 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const percentile = submission.score !== null ? getPercentile(submission.score, peerStats.scores) : null
   const earnedPoints = submission.score !== null ? Math.round((submission.score / 100) * totalPoints) : 0
 
-  // Section-level breakdown
   const sectionBreakdown = assessment.sections.map(sec => {
     let secEarned = 0
     let secPossible = 0
     let secCorrect = 0
-    let secTotal = sec.questions.length
+    const secTotal = sec.questions.length
 
     for (const q of sec.questions) {
       secPossible += q.points
@@ -202,19 +205,19 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         Back to Results
       </Link>
 
-      {/* Header: Candidate info */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 32, flexWrap: 'wrap', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--cream)', color: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--cream)', color: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 600, flexShrink: 0, fontFamily: 'var(--font-sans)' }}>
             {getInitials(candidate.name)}
           </div>
           <div>
-            <h1 style={{ fontSize: 24, color: 'var(--navy)', marginBottom: 2 }}>{candidate.name}</h1>
+            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26, fontWeight: 400, color: 'var(--navy)', marginBottom: 2 }}>{candidate.name}</h1>
             <p style={{ fontSize: 13, color: 'var(--text-mut)' }}>{candidate.email}</p>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-mut)', marginBottom: 4 }}>{assessment.title}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--navy)', marginBottom: 4 }}>{assessment.title}</div>
           <div style={{ fontSize: 12, color: 'var(--text-mut)' }}>
             {assessment.projects?.name ?? 'No Project'} {assessment.role ? `· ${assessment.role}` : ''}
           </div>
@@ -224,47 +227,47 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       {/* Score overview cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 32 }}>
         {/* Score */}
-        <div className="card" style={{ padding: '24px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-mut)', marginBottom: 8 }}>Score</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 36, fontWeight: 700, color: submission.passed ? 'var(--success)' : submission.passed === false ? 'var(--danger)' : 'var(--navy)', marginBottom: 4 }}>
+        <div className="card card-pad" style={{ textAlign: 'center' }}>
+          <div style={LABEL}>Score</div>
+          <div style={{ ...METRIC, fontSize: 36, color: submission.passed ? 'var(--success)' : submission.passed === false ? 'var(--danger)' : 'var(--navy)' }}>
             {submission.score !== null ? `${submission.score}%` : '--'}
           </div>
           {submission.passed !== null && (
-            <span className={`pill ${submission.passed ? 'pill-success' : 'pill-danger'}`} style={{ fontSize: 11 }}>
+            <span className={`pill ${submission.passed ? 'pill-success' : 'pill-danger'}`}>
               {submission.passed ? 'Passed' : 'Failed'}
             </span>
           )}
         </div>
 
         {/* Points */}
-        <div className="card" style={{ padding: '24px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-mut)', marginBottom: 8 }}>Points</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 36, fontWeight: 700, color: 'var(--navy)', marginBottom: 4 }}>
-            {earnedPoints}<span style={{ fontSize: 18, color: 'var(--text-mut)', fontWeight: 400 }}>/{totalPoints}</span>
+        <div className="card card-pad" style={{ textAlign: 'center' }}>
+          <div style={LABEL}>Points</div>
+          <div style={METRIC}>
+            {earnedPoints}<span style={{ fontSize: 20, color: 'var(--text-mut)' }}>/{totalPoints}</span>
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-mut)' }}>
+          <span style={SUB_TEXT}>
             {allQuestions.length} question{allQuestions.length !== 1 ? 's' : ''}
           </span>
         </div>
 
         {/* Ranking */}
-        <div className="card" style={{ padding: '24px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-mut)', marginBottom: 8 }}>Ranking</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 4 }}>
+        <div className="card card-pad" style={{ textAlign: 'center' }}>
+          <div style={LABEL}>Ranking</div>
+          <div style={{ ...METRIC, fontSize: percentile !== null && getPercentileLabel(percentile).length > 8 ? 24 : 32 }}>
             {percentile !== null ? getPercentileLabel(percentile) : '--'}
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-mut)' }}>
+          <span style={SUB_TEXT}>
             {peerStats.total > 1 ? `out of ${peerStats.total} candidates` : peerStats.total === 1 ? 'only candidate' : 'no peers yet'}
           </span>
         </div>
 
         {/* Time */}
-        <div className="card" style={{ padding: '24px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-mut)', marginBottom: 8 }}>Time Taken</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 4 }}>
+        <div className="card card-pad" style={{ textAlign: 'center' }}>
+          <div style={LABEL}>Time Taken</div>
+          <div style={METRIC}>
             {formatDuration(submission.started_at, submission.completed_at)}
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-mut)' }}>
+          <span style={SUB_TEXT}>
             of {assessment.time_limit}m allowed
           </span>
         </div>
@@ -272,64 +275,63 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
       {/* Comparison with average */}
       {submission.score !== null && peerStats.total > 1 && (
-        <div className="card" style={{ padding: '24px', marginBottom: 32 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 16 }}>Comparison with Average</div>
+        <div className="card card-pad" style={{ marginBottom: 32 }}>
+          <h3 style={SECTION_TITLE}>Comparison with Average</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-            {/* Bar chart visual */}
             <div style={{ flex: 1, minWidth: 240 }}>
               {/* This candidate */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                   <span style={{ fontWeight: 600, color: 'var(--navy)' }}>{candidate.name}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: submission.passed ? 'var(--success)' : 'var(--danger)' }}>{submission.score}%</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: submission.passed ? 'var(--success)' : 'var(--danger)' }}>{submission.score}%</span>
                 </div>
-                <div style={{ height: 10, borderRadius: 5, background: 'var(--border-light)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${submission.score}%`, borderRadius: 5, background: submission.passed ? 'var(--success)' : 'var(--danger)', transition: 'width 0.6s ease' }} />
+                <div style={{ height: 8, borderRadius: 4, background: 'var(--border-light)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${submission.score}%`, borderRadius: 4, background: submission.passed ? 'var(--success)' : 'var(--danger)', transition: 'width 0.6s ease' }} />
                 </div>
               </div>
               {/* Average */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                   <span style={{ color: 'var(--text-mut)' }}>Average ({peerStats.total} candidates)</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-mut)' }}>{peerStats.avgScore}%</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--text-mut)' }}>{peerStats.avgScore}%</span>
                 </div>
-                <div style={{ height: 10, borderRadius: 5, background: 'var(--border-light)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${peerStats.avgScore}%`, borderRadius: 5, background: 'var(--text-mut)', transition: 'width 0.6s ease' }} />
+                <div style={{ height: 8, borderRadius: 4, background: 'var(--border-light)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${peerStats.avgScore}%`, borderRadius: 4, background: 'var(--text-mut)', transition: 'width 0.6s ease' }} />
                 </div>
               </div>
             </div>
 
             {/* Delta */}
             <div style={{ textAlign: 'center', minWidth: 100 }}>
-              <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: (submission.score ?? 0) >= peerStats.avgScore ? 'var(--success)' : 'var(--danger)' }}>
+              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400, color: (submission.score ?? 0) >= peerStats.avgScore ? 'var(--success)' : 'var(--danger)' }}>
                 {(submission.score ?? 0) >= peerStats.avgScore ? '+' : ''}{(submission.score ?? 0) - peerStats.avgScore}%
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-mut)' }}>vs average</div>
+              <div style={SUB_TEXT}>vs average</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Section breakdown */}
-      <div className="card" style={{ padding: '24px', marginBottom: 32 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 16 }}>Section Breakdown</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="card card-pad" style={{ marginBottom: 32 }}>
+        <h3 style={SECTION_TITLE}>Section Breakdown</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {sectionBreakdown.map((sec, i) => (
             <div key={i}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{sec.title}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--navy)' }}>{sec.title}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-mut)' }}>{sec.correct}/{sec.total} correct</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 600, color: sec.percent >= 70 ? 'var(--success)' : sec.percent >= 50 ? 'var(--accent)' : 'var(--danger)' }}>
+                  <span style={SUB_TEXT}>{sec.correct}/{sec.total} correct</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: sec.percent >= 70 ? 'var(--success)' : sec.percent >= 50 ? 'var(--accent)' : 'var(--danger)' }}>
                     {sec.percent}%
                   </span>
                 </div>
               </div>
-              <div style={{ height: 8, borderRadius: 4, background: 'var(--border-light)', overflow: 'hidden' }}>
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--border-light)', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
                   width: `${sec.percent}%`,
-                  borderRadius: 4,
+                  borderRadius: 3,
                   background: sec.percent >= 70 ? 'var(--success)' : sec.percent >= 50 ? 'var(--accent)' : 'var(--danger)',
                   transition: 'width 0.6s ease',
                 }} />
@@ -340,44 +342,39 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Question-by-question */}
-      <div className="card" style={{ padding: '24px', marginBottom: 32 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 16 }}>Question Details</div>
+      <div className="card card-pad" style={{ marginBottom: 32 }}>
+        <h3 style={SECTION_TITLE}>Question Details</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {allQuestions.map(({ section, question: q }, i) => {
+          {allQuestions.map(({ question: q }, i) => {
             const answer = submission.answers[q.id]
             const result = scoreQuestion(q, answer)
             const answered = answer !== undefined && answer !== null && answer !== ''
 
             return (
-              <div key={q.id} style={{ padding: '16px', borderRadius: 12, border: '1px solid var(--border-light)', background: result.correct === true ? 'rgba(16,185,129,0.03)' : result.correct === false ? 'rgba(239,68,68,0.03)' : 'transparent' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+              <div key={q.id} style={{ padding: '16px 18px', borderRadius: 12, border: '1px solid var(--border-light)', background: result.correct === true ? 'var(--success-light)' : result.correct === false ? 'var(--danger-light)' : 'var(--cream)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-mut)', flexShrink: 0 }}>Q{i + 1}</span>
-                    <span style={{ fontSize: 13, color: 'var(--navy)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.text}</span>
+                    <span style={{ fontSize: 13, color: 'var(--navy)', fontWeight: 500 }}>{q.text}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     <span className={`pill ${q.type === 'multiple_choice' ? 'pill-blue' : q.type === 'fill_blank' ? 'pill-accent' : q.type === 'ranking' ? 'pill-purple' : 'pill-navy'}`} style={{ fontSize: 10, padding: '2px 8px' }}>
                       {q.type.replace('_', ' ')}
                     </span>
                     {result.correct === true && (
-                      <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                      </span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                     )}
                     {result.correct === false && (
-                      <span style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                      </span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     )}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--text-mut)' }}>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-mut)' }}>
                       {result.earned}/{q.points}pt
                     </span>
                   </div>
                 </div>
 
-                {/* Candidate's answer */}
                 {answered && (
-                  <div style={{ fontSize: 12, color: 'var(--text-sec)', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-sec)', marginTop: 6 }}>
                     <span style={{ color: 'var(--text-mut)', marginRight: 4 }}>Answer:</span>
                     {q.type === 'multiple_choice' && q.options
                       ? q.options[answer as number] ?? String(answer)
@@ -388,18 +385,17 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
                 {!answered && (
-                  <div style={{ fontSize: 12, color: 'var(--text-mut)', fontStyle: 'italic', marginTop: 4 }}>Not answered</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-mut)', fontStyle: 'italic', marginTop: 6 }}>Not answered</div>
                 )}
 
-                {/* Show correct answer for wrong answers */}
                 {result.correct === false && q.type === 'multiple_choice' && q.options && q.correct !== undefined && (
-                  <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 3 }}>
                     <span style={{ color: 'var(--text-mut)', marginRight: 4 }}>Correct:</span>
                     {q.options[q.correct]}
                   </div>
                 )}
                 {result.correct === false && q.type === 'fill_blank' && q.accepted_answers && (
-                  <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 3 }}>
                     <span style={{ color: 'var(--text-mut)', marginRight: 4 }}>Accepted:</span>
                     {q.accepted_answers.join(', ')}
                   </div>
@@ -410,8 +406,8 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* Metadata */}
-      <div className="card" style={{ padding: '20px 24px', marginBottom: 32 }}>
+      {/* Metadata footer */}
+      <div className="card" style={{ padding: '18px 24px', marginBottom: 32 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, fontSize: 13 }}>
           <div>
             <span style={{ color: 'var(--text-mut)' }}>Status: </span>
