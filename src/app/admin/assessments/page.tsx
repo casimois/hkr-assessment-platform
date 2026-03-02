@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase, type Assessment, type Section } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
+import { getAccessibleProjectIds } from '@/lib/access'
+import { hasMinRole } from '@/lib/access'
 
 /* ---------- types ---------- */
 type AssessmentWithProject = Assessment & { projects: { name: string } | null }
@@ -21,6 +24,7 @@ function countQuestions(sections: Section[] | unknown): number {
 
 /* ---------- component ---------- */
 export default function AssessmentsPage() {
+  const { profile } = useAuth()
   const [assessments, setAssessments] = useState<AssessmentWithProject[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -28,15 +32,25 @@ export default function AssessmentsPage() {
   const [projectFilter, setProjectFilter] = useState('all')
   const [stats, setStats] = useState<Record<string, { sent: number; avg: number | null }>>({})
 
+  const canManage = hasMinRole(profile?.role, 'admin')
+
   useEffect(() => {
     async function load() {
       try {
         const { data, error } = await supabase.from('assessments').select('*, projects(name)')
         if (error || !data || data.length === 0) throw error
-        setAssessments(data as AssessmentWithProject[])
+
+        // Scope by accessible projects for 'user' role
+        let filtered = data as AssessmentWithProject[]
+        if (profile?.role === 'user') {
+          const { data: projects } = await supabase.from('projects').select('*')
+          const accessibleIds = getAccessibleProjectIds(projects ?? [], profile)
+          filtered = filtered.filter(a => a.project_id && accessibleIds.includes(a.project_id))
+        }
+        setAssessments(filtered)
 
         const statMap: Record<string, { sent: number; avg: number | null }> = {}
-        for (const a of data) {
+        for (const a of filtered) {
           const { data: subs } = await supabase.from('submissions').select('score').eq('assessment_id', a.id)
           const sent = subs?.length ?? 0
           const scores = subs?.map(s => s.score).filter((s): s is number => s !== null) ?? []
@@ -49,7 +63,7 @@ export default function AssessmentsPage() {
       } finally { setLoading(false) }
     }
     load()
-  }, [])
+  }, [profile])
 
   const projectNames = [...new Set(assessments.map(a => a.projects?.name).filter(Boolean))] as string[]
 
@@ -80,10 +94,12 @@ export default function AssessmentsPage() {
           <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Assessments</h1>
           <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Create and manage candidate assessments</p>
         </div>
-        <Link href="/admin/assessments/new" className="btn btn-primary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          New Assessment
-        </Link>
+        {canManage && (
+          <Link href="/admin/assessments/new" className="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            New Assessment
+          </Link>
+        )}
       </div>
 
       {/* Filters */}
@@ -159,13 +175,13 @@ export default function AssessmentsPage() {
                   </button>
 
                   {/* Delete */}
-                  <button onClick={e => handleDelete(e, a.id)} title="Delete"
+                  {canManage && <button onClick={e => handleDelete(e, a.id)} title="Delete"
                     style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--white)', color: 'var(--text-mut)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}
                     onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)' }}
                     onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-mut)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg>
-                  </button>
+                  </button>}
                 </div>
               </div>
             </Link>

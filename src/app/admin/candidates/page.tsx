@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { getAccessibleProjectIds } from "@/lib/access";
 import InviteModal from "@/components/admin/InviteModal";
 import GenerateLinkModal from "@/components/admin/GenerateLinkModal";
 
@@ -21,6 +23,7 @@ function getInitials(name: string): string {
 }
 
 export default function CandidatesPage() {
+  const { profile } = useAuth();
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [assessments, setAssessments] = useState<AssessmentOption[]>([]);
   const [search, setSearch] = useState("");
@@ -30,16 +33,36 @@ export default function CandidatesPage() {
   useEffect(() => {
     async function fetchData() {
       try {
+        // If user role, get accessible project IDs first
+        let accessibleIds: string[] | null = null;
+        if (profile?.role === 'user') {
+          const { data: projects } = await supabase.from('projects').select('*');
+          accessibleIds = getAccessibleProjectIds(projects ?? [], profile);
+        }
+
         const [candResult, assessResult] = await Promise.all([
           supabase
             .from("candidates")
-            .select("*, submissions(id, score, status, assessments(title))")
+            .select("*, submissions(id, score, status, assessment_id, assessments(title, project_id))")
             .order("created_at", { ascending: false }),
           supabase.from("assessments").select("id, title").eq("status", "active"),
         ]);
 
         if (!candResult.error && candResult.data && candResult.data.length > 0) {
-          const mapped: CandidateRow[] = candResult.data.map((row: Record<string, unknown>) => {
+          let candidateData = candResult.data;
+
+          // Filter candidates: only those with at least one submission in accessible projects
+          if (accessibleIds) {
+            candidateData = candidateData.filter((row: Record<string, unknown>) => {
+              const submissions = (row.submissions ?? []) as Record<string, unknown>[];
+              return submissions.some(s => {
+                const assessment = s.assessments as Record<string, unknown> | null;
+                return assessment?.project_id && accessibleIds!.includes(assessment.project_id as string);
+              });
+            });
+          }
+
+          const mapped: CandidateRow[] = candidateData.map((row: Record<string, unknown>) => {
             const submissions = (row.submissions ?? []) as Record<string, unknown>[];
             const latest = submissions[0] as Record<string, unknown> | undefined;
             const latestAssessment = latest?.assessments as Record<string, unknown> | undefined;
@@ -71,7 +94,7 @@ export default function CandidatesPage() {
       }
     }
     fetchData();
-  }, []);
+  }, [profile]);
 
   const filtered = candidates.filter((c) => {
     if (!search) return true;

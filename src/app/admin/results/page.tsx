@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { getAccessibleProjectIds } from "@/lib/access";
 
 type ResultRow = {
   id: string;
@@ -25,6 +27,7 @@ function formatStatus(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, 
 
 export default function ResultsPage() {
   const router = useRouter();
+  const { profile } = useAuth();
   const [results, setResults] = useState<ResultRow[]>([]);
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -40,7 +43,18 @@ export default function ResultsPage() {
           .order("created_at", { ascending: false });
         if (error || !data || data.length === 0) return;
 
-        setResults(data.map((row: Record<string, unknown>) => {
+        // Scope by accessible projects for 'user' role
+        let scopedData = data;
+        if (profile?.role === 'user') {
+          const { data: projects } = await supabase.from('projects').select('*');
+          const accessibleIds = getAccessibleProjectIds(projects ?? [], profile);
+          scopedData = data.filter((row: Record<string, unknown>) => {
+            const assessment = row.assessments as Record<string, unknown> | null;
+            return assessment?.project_id && accessibleIds.includes(assessment.project_id as string);
+          });
+        }
+
+        setResults(scopedData.map((row: Record<string, unknown>) => {
           const assessment = row.assessments as Record<string, unknown> | null;
           const candidate = row.candidates as Record<string, unknown> | null;
           const project = assessment?.projects as Record<string, unknown> | null;
@@ -60,7 +74,7 @@ export default function ResultsPage() {
       } catch { /* fallback */ }
     }
     fetchResults();
-  }, []);
+  }, [profile]);
 
   const projects = [...new Set(results.map(r => r.project))];
 

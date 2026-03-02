@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
+import { getAccessibleProjectIds } from '@/lib/access'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -51,6 +53,7 @@ const EMPTY_STATS: StatCard[] = [
 /* ------------------------------------------------------------------ */
 
 export default function DashboardPage() {
+  const { profile } = useAuth()
   const [stats, setStats] = useState<StatCard[]>(EMPTY_STATS)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [assessments, setAssessments] = useState<ActiveAssessment[]>([])
@@ -64,6 +67,10 @@ export default function DashboardPage() {
           return
         }
 
+        // Fetch projects for scoping
+        const { data: projects } = await supabase.from('projects').select('*')
+        const accessibleIds = getAccessibleProjectIds(projects ?? [], profile)
+
         const { data: submissions } = await supabase
           .from('submissions')
           .select('*, candidates(*), assessments(*)')
@@ -74,15 +81,29 @@ export default function DashboardPage() {
           .select('*')
           .eq('status', 'active')
 
-        if (submissions && submissions.length > 0) {
-          const totalSent = submissions.length
-          const opened = submissions.filter((s: Record<string, unknown>) => s.started_at || s.status !== 'pending').length
-          const completed = submissions.filter((s: Record<string, unknown>) => s.status === 'completed').length
-          const scored = submissions.filter((s: Record<string, unknown>) => s.score !== null && s.score !== undefined)
+        // Filter by accessible projects for 'user' role
+        const isUserRole = profile?.role === 'user'
+        const filteredSubmissions = isUserRole
+          ? (submissions ?? []).filter((s: Record<string, unknown>) => {
+              const assessment = s.assessments as Record<string, unknown> | null
+              return assessment?.project_id && accessibleIds.includes(assessment.project_id as string)
+            })
+          : (submissions ?? [])
+        const filteredAssessments = isUserRole
+          ? (allAssessments ?? []).filter((a: Record<string, unknown>) =>
+              a.project_id && accessibleIds.includes(a.project_id as string)
+            )
+          : (allAssessments ?? [])
+
+        if (filteredSubmissions.length > 0) {
+          const totalSent = filteredSubmissions.length
+          const opened = filteredSubmissions.filter((s: Record<string, unknown>) => s.started_at || s.status !== 'pending').length
+          const completed = filteredSubmissions.filter((s: Record<string, unknown>) => s.status === 'completed').length
+          const scored = filteredSubmissions.filter((s: Record<string, unknown>) => s.score !== null && s.score !== undefined)
           const avgScore = scored.length
             ? Math.round(scored.reduce((sum: number, s: Record<string, unknown>) => sum + ((s.score as number) ?? 0), 0) / scored.length)
             : 0
-          const passed = submissions.filter((s: Record<string, unknown>) => s.passed === true).length
+          const passed = filteredSubmissions.filter((s: Record<string, unknown>) => s.passed === true).length
 
           setStats([
             { label: 'Tests Sent', value: String(totalSent), subtitle: 'All time' },
@@ -93,7 +114,7 @@ export default function DashboardPage() {
           ])
 
           setActivity(
-            submissions.slice(0, 6).map((s: Record<string, unknown>) => {
+            filteredSubmissions.slice(0, 6).map((s: Record<string, unknown>) => {
               const cand = s.candidates as Record<string, unknown> | null
               const assess = s.assessments as Record<string, unknown> | null
               const name = (cand?.name as string) ?? 'Unknown'
@@ -115,10 +136,10 @@ export default function DashboardPage() {
           )
         }
 
-        if (allAssessments && allAssessments.length > 0) {
+        if (filteredAssessments.length > 0) {
           setAssessments(
-            allAssessments.map((a: Record<string, unknown>) => {
-              const subs = submissions?.filter((s: Record<string, unknown>) => s.assessment_id === a.id) ?? []
+            filteredAssessments.map((a: Record<string, unknown>) => {
+              const subs = filteredSubmissions.filter((s: Record<string, unknown>) => s.assessment_id === a.id)
               const scored = subs.filter((s: Record<string, unknown>) => s.score !== null && s.score !== undefined)
               const avg = scored.length
                 ? Math.round(scored.reduce((sum: number, s: Record<string, unknown>) => sum + ((s.score as number) ?? 0), 0) / scored.length)
@@ -143,7 +164,7 @@ export default function DashboardPage() {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [profile])
 
   function statusPill(status: ActivityItem['status'], score?: string) {
     const config: Record<ActivityItem['status'], { cls: string; label: string }> = {

@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
+import { hasMinRole } from '@/lib/access'
 
 interface ProjectRow {
   id: string
@@ -14,8 +17,17 @@ interface ProjectRow {
 }
 
 export default function ProjectsPage() {
+  const { profile } = useAuth()
+  const router = useRouter()
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Redirect 'user' role
+  useEffect(() => {
+    if (profile && !hasMinRole(profile.role, 'admin')) {
+      router.push('/admin/dashboard')
+    }
+  }, [profile, router])
 
   useEffect(() => {
     async function fetchProjects() {

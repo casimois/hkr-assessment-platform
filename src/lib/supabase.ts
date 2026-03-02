@@ -98,3 +98,20 @@ export type Assessment = Database['public']['Tables']['assessments']['Row']
 export type Candidate = Database['public']['Tables']['candidates']['Row']
 export type Submission = Database['public']['Tables']['submissions']['Row']
 export type Project = Database['public']['Tables']['projects']['Row']
+
+export type UserRole = 'super_admin' | 'admin' | 'user'
+export type UserStatus = 'active' | 'inactive' | 'pending'
+
+export type Profile = {
+  id: string
+  email: string
+  full_name: string | null
+  role: UserRole
+  status: UserStatus
+  assigned_teams: string[]
+  assigned_clients: string[]
+  invited_by: string | null
+  last_login: string | null
+  created_at: string
+  updated_at: string
+}

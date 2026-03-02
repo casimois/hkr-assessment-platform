@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { hasMinRole } from '@/lib/access';
+import type { UserRole } from '@/lib/supabase';
 
 /* ------------------------------------------------------------------ */
 /*  SVG icon components for sidebar nav                                */
@@ -47,6 +49,12 @@ const icons = {
       <path d="M14.7 11.1C14.61 11.3 14.58 11.52 14.63 11.73C14.68 11.94 14.8 12.13 14.97 12.27L15.03 12.33C15.17 12.47 15.28 12.63 15.35 12.81C15.42 12.99 15.46 13.19 15.46 13.39C15.46 13.59 15.42 13.78 15.35 13.97C15.28 14.15 15.17 14.31 15.03 14.45C14.89 14.59 14.73 14.7 14.55 14.77C14.37 14.84 14.18 14.88 13.98 14.88C13.78 14.88 13.58 14.84 13.4 14.77C13.22 14.7 13.06 14.59 12.92 14.45L12.86 14.39C12.72 14.22 12.53 14.1 12.32 14.05C12.11 14 11.89 14.03 11.69 14.12C11.5 14.2 11.34 14.34 11.23 14.51C11.12 14.68 11.06 14.89 11.06 15.1V15.3C11.06 15.71 10.89 16.1 10.6 16.39C10.31 16.68 9.92 16.85 9.51 16.85C9.1 16.85 8.71 16.68 8.42 16.39C8.13 16.1 7.96 15.71 7.96 15.3V15.19C7.95 14.97 7.88 14.76 7.75 14.59C7.63 14.42 7.45 14.29 7.25 14.22C7.05 14.13 6.83 14.1 6.62 14.15C6.41 14.2 6.22 14.32 6.08 14.49L6.02 14.55C5.88 14.69 5.72 14.8 5.54 14.87C5.36 14.94 5.16 14.98 4.96 14.98C4.76 14.98 4.57 14.94 4.39 14.87C4.21 14.8 4.05 14.69 3.91 14.55C3.77 14.41 3.66 14.25 3.59 14.07C3.52 13.89 3.48 13.7 3.48 13.5C3.48 13.3 3.52 13.1 3.59 12.92C3.66 12.74 3.77 12.58 3.91 12.44L3.97 12.38C4.14 12.24 4.26 12.05 4.31 11.84C4.36 11.63 4.33 11.41 4.24 11.21C4.16 11.02 4.02 10.86 3.85 10.75C3.68 10.64 3.47 10.58 3.26 10.58H3.06C2.65 10.58 2.26 10.41 1.97 10.12C1.68 9.83 1.51 9.44 1.51 9.03C1.51 8.62 1.68 8.23 1.97 7.94C2.26 7.65 2.65 7.48 3.06 7.48H3.17C3.39 7.47 3.6 7.4 3.77 7.27C3.94 7.15 4.07 6.97 4.14 6.77C4.23 6.57 4.26 6.35 4.21 6.14C4.16 5.93 4.04 5.74 3.87 5.6L3.81 5.54C3.67 5.4 3.56 5.24 3.49 5.06C3.42 4.88 3.38 4.69 3.38 4.49C3.38 4.29 3.42 4.09 3.49 3.91C3.56 3.73 3.67 3.57 3.81 3.43C3.95 3.29 4.11 3.18 4.29 3.11C4.47 3.04 4.66 3 4.86 3C5.06 3 5.26 3.04 5.44 3.11C5.62 3.18 5.78 3.29 5.92 3.43L5.98 3.49C6.12 3.66 6.31 3.78 6.52 3.83C6.73 3.88 6.95 3.85 7.15 3.76H7.25C7.44 3.68 7.6 3.54 7.71 3.37C7.82 3.2 7.88 2.99 7.88 2.78V2.58C7.88 2.17 8.05 1.78 8.34 1.49C8.63 1.2 9.02 1.03 9.43 1.03C9.84 1.03 10.23 1.2 10.52 1.49C10.81 1.78 10.98 2.17 10.98 2.58V2.69C10.98 2.9 11.04 3.11 11.15 3.28C11.26 3.45 11.42 3.59 11.61 3.67C11.81 3.76 12.03 3.79 12.24 3.74C12.45 3.69 12.64 3.57 12.78 3.4L12.84 3.34C12.98 3.2 13.14 3.09 13.32 3.02C13.5 2.95 13.7 2.91 13.9 2.91C14.1 2.91 14.29 2.95 14.47 3.02C14.65 3.09 14.81 3.2 14.95 3.34C15.09 3.48 15.2 3.64 15.27 3.82C15.34 4 15.38 4.2 15.38 4.4C15.38 4.6 15.34 4.79 15.27 4.97C15.2 5.15 15.09 5.31 14.95 5.45L14.89 5.51C14.72 5.65 14.6 5.84 14.55 6.05C14.5 6.26 14.53 6.48 14.62 6.68V6.78C14.7 6.97 14.84 7.13 15.01 7.24C15.18 7.35 15.39 7.41 15.6 7.41H15.8C16.21 7.41 16.6 7.58 16.89 7.87C17.18 8.16 17.35 8.55 17.35 8.96C17.35 9.37 17.18 9.76 16.89 10.05C16.6 10.34 16.21 10.51 15.8 10.51H15.69C15.48 10.51 15.27 10.57 15.1 10.68C14.93 10.79 14.79 10.95 14.7 11.14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  account: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="9" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2.5 16C2.5 13.1 5.41 10.75 9 10.75C12.59 10.75 15.5 13.1 15.5 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
   exit: (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M6.75 15.75H3.75C3.35 15.75 2.97 15.59 2.69 15.31C2.41 15.03 2.25 14.65 2.25 14.25V3.75C2.25 3.35 2.41 2.97 2.69 2.69C2.97 2.41 3.35 2.25 3.75 2.25H6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -64,6 +72,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  minRole: UserRole;
 }
 
 interface NavSection {
@@ -75,22 +84,28 @@ const navSections: NavSection[] = [
   {
     title: 'Overview',
     items: [
-      { label: 'Dashboard', href: '/admin/dashboard', icon: icons.dashboard },
+      { label: 'Dashboard', href: '/admin/dashboard', icon: icons.dashboard, minRole: 'user' },
     ],
   },
   {
     title: 'Assessments',
     items: [
-      { label: 'Assessments', href: '/admin/assessments', icon: icons.assessments },
-      { label: 'Results', href: '/admin/results', icon: icons.results },
-      { label: 'Candidates', href: '/admin/candidates', icon: icons.candidates },
+      { label: 'Assessments', href: '/admin/assessments', icon: icons.assessments, minRole: 'user' },
+      { label: 'Results', href: '/admin/results', icon: icons.results, minRole: 'user' },
+      { label: 'Candidates', href: '/admin/candidates', icon: icons.candidates, minRole: 'user' },
     ],
   },
   {
     title: 'Organization',
     items: [
-      { label: 'Projects', href: '/admin/projects', icon: icons.projects },
-      { label: 'Settings', href: '/admin/settings', icon: icons.settings },
+      { label: 'Projects', href: '/admin/projects', icon: icons.projects, minRole: 'admin' },
+      { label: 'Settings', href: '/admin/settings', icon: icons.settings, minRole: 'super_admin' },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { label: 'Account', href: '/admin/account', icon: icons.account, minRole: 'user' },
     ],
   },
 ];
@@ -107,13 +122,21 @@ const pageTitles: Record<string, string> = {
   '/admin/candidates': 'Candidates',
   '/admin/projects': 'Projects',
   '/admin/settings': 'Settings',
+  '/admin/account': 'Account',
 };
 
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
   if (pathname.includes('/assessments/') && pathname.includes('/edit')) return 'Edit Assessment';
+  if (pathname.startsWith('/admin/results/')) return 'Result Detail';
   return 'Admin';
 }
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  user: 'User',
+};
 
 /* ------------------------------------------------------------------ */
 /*  Layout component                                                   */
@@ -122,14 +145,22 @@ function getPageTitle(pathname: string): string {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
 
   const currentTitle = getPageTitle(pathname);
+  const userRole = profile?.role ?? 'user';
 
   // Derive user display info
-  const userEmail = user?.email ?? 'admin@hkr.team';
-  const userName = user?.user_metadata?.full_name ?? userEmail.split('@')[0];
+  const userName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'User';
   const userInitials = userName.split(/[\s.]+/).map((w: string) => w[0]?.toUpperCase()).join('').slice(0, 2);
+
+  // Filter nav sections based on role
+  const filteredNavSections = navSections
+    .map(section => ({
+      ...section,
+      items: section.items.filter(item => hasMinRole(userRole, item.minRole)),
+    }))
+    .filter(section => section.items.length > 0);
 
   if (loading) {
     return (
@@ -142,6 +173,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!user) {
     router.push('/login');
+    return null;
+  }
+
+  // Redirect if accessing a page the role can't see
+  const isSettingsPage = pathname.startsWith('/admin/settings');
+  const isProjectsPage = pathname === '/admin/projects';
+  if (isSettingsPage && !hasMinRole(userRole, 'super_admin')) {
+    router.push('/admin/dashboard');
+    return null;
+  }
+  if (isProjectsPage && !hasMinRole(userRole, 'admin')) {
+    router.push('/admin/dashboard');
     return null;
   }
 
@@ -171,7 +214,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav sections */}
         <nav style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {navSections.map((section) => (
+          {filteredNavSections.map((section) => (
             <div key={section.title} style={{ marginBottom: 4 }}>
               <div
                 style={{
@@ -276,7 +319,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   color: 'rgba(255,255,255,0.4)',
                 }}
               >
-                Admin
+                {ROLE_LABELS[userRole]}
               </div>
             </div>
           </div>
