@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { hasMinRole } from '@/lib/access';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import type { UserRole } from '@/lib/supabase';
 
 /* ------------------------------------------------------------------ */
@@ -173,6 +174,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!user) {
     router.push('/login');
+    return null;
+  }
+
+  // Block deactivated users — sign them out and redirect to login with message
+  if (profile?.status === 'inactive') {
+    signOut().then(() => router.push('/login?deactivated=1'));
     return null;
   }
 
@@ -398,7 +405,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             padding: 32,
           }}
         >
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

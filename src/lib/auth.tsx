@@ -28,12 +28,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data as Profile | null)
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      // If account is deactivated, sign out and redirect with message
+      if (data?.status === 'inactive') {
+        await supabase.auth.signOut()
+        setUser(null)
+        setProfile(null)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login?deactivated=1'
+        }
+        return
+      }
+
+      setProfile(data as Profile | null)
+    } catch (err) {
+      console.error('Failed to fetch profile:', err)
+      setProfile(null)
+    }
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -48,27 +65,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const u = session?.user ?? null
-      setUser(u)
-      if (u) {
-        await fetchProfile(u.id)
-      }
-      setLoading(false)
-    })
+    let subscription: { unsubscribe: () => void } | null = null
+    let resolved = false
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const u = session?.user ?? null
-      setUser(u)
-      if (u) {
-        await fetchProfile(u.id)
-      } else {
-        setProfile(null)
+    const done = () => {
+      if (!resolved) {
+        resolved = true
+        setLoading(false)
       }
-      setLoading(false)
-    })
+    }
 
-    return () => subscription.unsubscribe()
+    // Safety timeout: if auth init takes > 4s, force loading=false
+    // so the login form shows and the user can sign in manually
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        console.warn('[auth] Safety timeout — forcing loading=false after 4s')
+        done()
+      }
+    }, 4000)
+
+    try {
+      const auth = supabase.auth
+      if (!auth) {
+        done()
+        clearTimeout(timeout)
+        return
+      }
+
+      // Use onAuthStateChange as the PRIMARY session source.
+      // getSession() can hang due to internal lock contention, but
+      // onAuthStateChange fires immediately with INITIAL_SESSION/SIGNED_IN.
+      const { data } = auth.onAuthStateChange((_event, session) => {
+        const u = session?.user ?? null
+        setUser(u)
+        if (u) {
+          // Fire-and-forget profile fetch — don't block done()
+          fetchProfile(u.id)
+        } else {
+          setProfile(null)
+        }
+        done()
+      })
+      subscription = data.subscription
+
+      // Also call getSession as a fallback in case onAuthStateChange
+      // doesn't fire (e.g., no session at all).
+      auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          // No session — make sure we stop loading
+          setUser(null)
+          done()
+        }
+        // If there IS a session, onAuthStateChange already handled it
+      }).catch(() => {
+        done()
+      })
+    } catch (err) {
+      console.error('[auth] Auth init error:', err)
+      done()
+    }
+
+    return () => {
+      clearTimeout(timeout)
+      subscription?.unsubscribe()
+    }
   }, [fetchProfile])
 
   const signIn = async (email: string, password: string) => {
@@ -79,7 +139,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message }
 
     if (data.user) {
-      await fetchProfile(data.user.id)
+      // Fetch profile and check if account is active
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileData?.status === 'inactive') {
+        // Account is deactivated — sign out immediately and return error
+        await supabase.auth.signOut()
+        setUser(null)
+        setProfile(null)
+        return { error: 'Your account has been deactivated. Please contact an administrator.' }
+      }
+
+      setProfile(profileData as Profile | null)
+
       // Update last_login
       await supabase
         .from('profiles')

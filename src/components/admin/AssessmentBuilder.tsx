@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, isSupabaseConfigured, Assessment, Section, Question } from '@/lib/supabase'
+import { countPoolable } from '@/lib/question-pool'
 import QuestionEditor from './QuestionEditor'
 
 type Props = { existingAssessment?: Assessment }
@@ -46,6 +47,7 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [addingTo, setAddingTo] = useState<number | null>(null)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   useEffect(() => {
     if (!isSupabaseConfigured) return
@@ -57,8 +59,70 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
   const totalQuestions = sections.reduce((s, sec) => s + sec.questions.length, 0)
   const totalPoints = sections.reduce((s, sec) => s + sec.questions.reduce((qs, q) => qs + (q.points * q.weight), 0), 0)
 
+  const validateAssessment = (): string[] => {
+    const errors: string[] = []
+    if (!title.trim()) errors.push('Assessment title is required.')
+    if (timeLimit < 1) errors.push('Time limit must be at least 1 minute.')
+    if (type === 'scoring' && (passThreshold < 0 || passThreshold > 100)) errors.push('Pass threshold must be 0–100.')
+
+    if (sections.length === 0) {
+      errors.push('Add at least one section.')
+    }
+
+    let qGlobal = 0
+    for (let si = 0; si < sections.length; si++) {
+      const sec = sections[si]
+      if (!sec.title.trim()) errors.push(`Section ${si + 1}: Title is required.`)
+      if (sec.questions.length === 0) errors.push(`Section "${sec.title || si + 1}": Add at least one question.`)
+
+      for (let qi = 0; qi < sec.questions.length; qi++) {
+        qGlobal++
+        const q = sec.questions[qi]
+        const label = `Q${qGlobal} (${sec.title || `Section ${si + 1}`})`
+
+        if (!q.text.trim()) errors.push(`${label}: Question text is required.`)
+        if (q.points < 0) errors.push(`${label}: Points cannot be negative.`)
+
+        if (q.type === 'multiple_choice') {
+          const opts = (q.options || []).filter(o => o.trim() !== '')
+          if (opts.length < 2) errors.push(`${label}: Multiple choice needs at least 2 non-empty options.`)
+          if (q.correct === undefined || q.correct === null) {
+            errors.push(`${label}: Select a correct answer.`)
+          } else if (q.correct < 0 || q.correct >= (q.options || []).length) {
+            errors.push(`${label}: Correct answer index is out of range.`)
+          }
+        }
+
+        if (q.type === 'fill_blank') {
+          if (!q.accepted_answers || q.accepted_answers.filter(a => a.trim() !== '').length === 0) {
+            errors.push(`${label}: Fill in the blank needs at least 1 accepted answer.`)
+          }
+        }
+
+        if (q.type === 'ranking') {
+          const items = (q.items || []).filter(it => it.trim() !== '')
+          if (items.length < 2) errors.push(`${label}: Ranking needs at least 2 non-empty items.`)
+        }
+
+        if (q.type === 'written') {
+          if (q.min_words && q.max_words && q.min_words > q.max_words) {
+            errors.push(`${label}: Min words cannot exceed max words.`)
+          }
+        }
+      }
+    }
+
+    return errors
+  }
+
   const handleSave = async () => {
-    if (!title.trim()) return alert('Please enter a title')
+    const errors = validateAssessment()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    setValidationErrors([])
     setSaving(true)
     const payload = {
       title, description: description || null, type, status,
@@ -119,6 +183,19 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
         </button>
       </div>
 
+      {/* Validation errors */}
+      {validationErrors.length > 0 && (
+        <div style={{ background: 'var(--danger-light)', border: '1px solid var(--danger)', borderRadius: 14, padding: '16px 20px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--danger)' }}>Please fix the following issues before saving:</span>
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: 'var(--danger)', lineHeight: 1.8 }}>
+            {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
+          </ul>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
         {/* Left column */}
         <div>
@@ -178,14 +255,55 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
           {/* Sections */}
           {sections.map((section, si) => (
             <div key={si} className="card" style={{ marginBottom: 16 }}>
-              <div style={{ padding: '20px 24px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)' }}>
+              <div style={{ padding: '20px 24px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="pill pill-navy">Section {si + 1}</span>
                   <input className="form-input" style={{ maxWidth: 280, padding: '8px 12px', fontSize: 14, fontWeight: 600 }} value={section.title} onChange={e => updateSection(si, { title: e.target.value })} />
                 </div>
-                {sections.length > 1 && (
-                  <button onClick={() => removeSection(si)} style={{ fontSize: 13, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {(() => {
+                    const poolableCount = countPoolable(section)
+                    if (poolableCount < 2) return null
+                    const isOn = section.randomize === true
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: isOn ? 'var(--accent-light)' : 'var(--cream)', borderRadius: 8, padding: '6px 12px', transition: 'background 0.15s' }}>
+                        {/* Toggle */}
+                        <div
+                          onClick={() => updateSection(si, {
+                            randomize: !isOn,
+                            pool_size: !isOn ? Math.min(5, poolableCount) : undefined,
+                          })}
+                          style={{ width: 36, height: 20, borderRadius: 10, background: isOn ? 'var(--accent)' : 'var(--border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
+                        >
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: isOn ? 18 : 2, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }} />
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isOn ? 'var(--accent)' : 'var(--text-mut)'} strokeWidth="2" strokeLinecap="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+                        {isOn ? (
+                          <>
+                            <span style={{ fontSize: 12, color: 'var(--text-sec)', whiteSpace: 'nowrap' }}>Show</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={poolableCount}
+                              value={section.pool_size ?? poolableCount}
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || poolableCount
+                                updateSection(si, { pool_size: Math.min(val, poolableCount) })
+                              }}
+                              style={{ width: 48, padding: '4px 6px', border: '1px solid var(--border-light)', borderRadius: 6, fontSize: 13, fontWeight: 600, textAlign: 'center', color: 'var(--navy)' }}
+                            />
+                            <span style={{ fontSize: 12, color: 'var(--text-sec)', whiteSpace: 'nowrap' }}>of {poolableCount} MC/Fill per candidate</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 12, color: 'var(--text-mut)', whiteSpace: 'nowrap' }}>Randomize MC/Fill</span>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  {sections.length > 1 && (
+                    <button onClick={() => removeSection(si)} style={{ fontSize: 13, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
+                  )}
+                </div>
               </div>
               <div style={{ padding: '16px 24px' }}>
                 {section.questions.map((q, qi) => {
@@ -234,13 +352,28 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
         <div style={{ position: 'sticky', top: 0 }}>
           <div className="card card-pad" style={{ marginBottom: 16 }}>
             <h3 style={{ fontSize: 16, color: 'var(--navy)', marginBottom: 16 }}>Summary</h3>
-            <div style={{ fontSize: 14, color: 'var(--text-sec)', lineHeight: 2 }}>
-              <div>Sections: <strong style={{ color: 'var(--navy)' }}>{sections.length}</strong></div>
-              <div>Questions: <strong style={{ color: 'var(--navy)' }}>{totalQuestions}</strong></div>
-              <div>Total Points: <strong style={{ color: 'var(--navy)' }}>{Math.round(totalPoints)}</strong></div>
-              <div>Time: <strong style={{ color: 'var(--navy)' }}>{timeLimit} min</strong></div>
-              {type === 'scoring' && <div>Threshold: <strong style={{ color: 'var(--navy)' }}>{passThreshold}%</strong></div>}
-            </div>
+            {(() => {
+              const randomizedSections = sections.filter(s => s.randomize && s.pool_size !== undefined)
+              const candidateQuestions = sections.reduce((sum, s) => {
+                if (!s.randomize || s.pool_size === undefined) return sum + s.questions.length
+                const poolableCount = countPoolable(s)
+                const fixedCount = s.questions.length - poolableCount
+                const selectedPoolable = Math.min(s.pool_size, poolableCount)
+                return sum + fixedCount + selectedPoolable
+              }, 0)
+              return (
+                <div style={{ fontSize: 14, color: 'var(--text-sec)', lineHeight: 2 }}>
+                  <div>Sections: <strong style={{ color: 'var(--navy)' }}>{sections.length}</strong></div>
+                  <div>Total questions: <strong style={{ color: 'var(--navy)' }}>{totalQuestions}</strong></div>
+                  {randomizedSections.length > 0 && (
+                    <div>Per candidate: <strong style={{ color: 'var(--accent)' }}>{candidateQuestions}</strong> <span style={{ fontSize: 11 }}>(MC/Fill randomized)</span></div>
+                  )}
+                  <div>Total Points: <strong style={{ color: 'var(--navy)' }}>{Math.round(totalPoints)}</strong></div>
+                  <div>Time: <strong style={{ color: 'var(--navy)' }}>{timeLimit} min</strong></div>
+                  {type === 'scoring' && <div>Threshold: <strong style={{ color: 'var(--navy)' }}>{passThreshold}%</strong></div>}
+                </div>
+              )
+            })()}
           </div>
           <div className="card card-pad">
             <h3 style={{ fontSize: 16, color: 'var(--navy)', marginBottom: 12 }}>Question Types</h3>

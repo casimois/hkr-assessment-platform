@@ -79,6 +79,28 @@ export default function AssessmentsPage() {
     navigator.clipboard.writeText(`${window.location.origin}/assess/${id}`)
   }
 
+  function handlePreview(e: React.MouseEvent, id: string) {
+    e.preventDefault(); e.stopPropagation()
+    window.open(`/admin/assessments/${id}/preview`, '_blank')
+  }
+
+  async function handleDuplicate(e: React.MouseEvent, assessment: AssessmentWithProject) {
+    e.preventDefault(); e.stopPropagation()
+    try {
+      const { id: _id, created_at: _c, updated_at: _u, projects: _p, ...rest } = assessment
+      const { data, error } = await supabase.from('assessments').insert({
+        ...rest,
+        title: `${assessment.title} (Copy)`,
+        status: 'draft',
+      }).select('*').single()
+      if (error || !data) throw error
+      setAssessments(prev => [...prev, { ...data, projects: assessment.projects } as AssessmentWithProject])
+      setStats(prev => ({ ...prev, [data.id]: { sent: 0, avg: null } }))
+    } catch (err) {
+      console.error('Duplicate error:', err)
+    }
+  }
+
   async function handleDelete(e: React.MouseEvent, id: string) {
     e.preventDefault(); e.stopPropagation()
     if (!confirm('Delete this assessment?')) return
@@ -165,7 +187,25 @@ export default function AssessmentsPage() {
                   <span className="pill" style={{ background: 'var(--navy)', color: '#fff' }}>{st.sent} sent</span>
                   {st.avg !== null && <span className="pill pill-blue">{st.avg}% avg</span>}
 
-                  {/* Copy */}
+                  {/* Preview */}
+                  <button onClick={e => handlePreview(e, a.id)} title="Preview"
+                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--white)', color: 'var(--text-mut)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--navy)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-mut)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                  </button>
+
+                  {/* Duplicate */}
+                  {canManage && <button onClick={e => handleDuplicate(e, a)} title="Duplicate"
+                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--white)', color: 'var(--text-mut)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--navy)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-mut)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16H2V4a2 2 0 012-2h12v2" /></svg>
+                  </button>}
+
+                  {/* Copy Link */}
                   <button onClick={e => handleCopy(e, a.id)} title="Copy link"
                     style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--white)', color: 'var(--text-mut)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}
                     onMouseEnter={e => { e.currentTarget.style.color = 'var(--navy)'; e.currentTarget.style.borderColor = 'var(--border)' }}

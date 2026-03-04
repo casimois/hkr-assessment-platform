@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         const roleLabel = role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'User'
 
         const { error: emailErr } = await resend.emails.send({
-          from: 'HKR.TEAM <onboarding@resend.dev>',
+          from: process.env.RESEND_FROM_EMAIL || 'HKR.TEAM <onboarding@resend.dev>',
           to: email,
           subject: 'You have been invited to HKR.TEAM',
           html: `

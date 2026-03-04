@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     const { error } = await resend.emails.send({
-      from: 'HKR.TEAM Assessments <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL || 'HKR.TEAM Assessments <onboarding@resend.dev>',
       to: candidateEmail,
       subject: `You've been invited to complete: ${assessmentTitle}`,
       html: `

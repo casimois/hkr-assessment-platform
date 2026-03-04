@@ -82,8 +82,8 @@ export default function ResultsPage() {
     if (search && !r.candidateEmail.toLowerCase().includes(search.toLowerCase()) && !r.candidateName.toLowerCase().includes(search.toLowerCase())) return false;
     if (projectFilter !== "all" && r.project !== projectFilter) return false;
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
-    if (passFilter === "passed" && r.passed !== true) return false;
-    if (passFilter === "failed" && r.passed !== false) return false;
+    if (passFilter === "passed" && (r.type === 'open' || r.passed !== true)) return false;
+    if (passFilter === "failed" && (r.type === 'open' || r.passed !== false)) return false;
     return true;
   });
 
@@ -171,7 +171,9 @@ export default function ResultsPage() {
                   <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--text-sec)' }}>{row.project}</td>
                   <td style={{ padding: '16px 20px' }}><span className={statusPillCls(row.status)}>{formatStatus(row.status)}</span></td>
                   <td style={{ padding: '16px 20px' }}>
-                    {row.score !== null ? (
+                    {row.type === 'open' ? (
+                      <span className="pill pill-purple" style={{ fontSize: 10, padding: '2px 8px' }}>Open</span>
+                    ) : row.score !== null ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 500, color: row.passed ? 'var(--success)' : 'var(--danger)' }}>{row.score}%</span>
                         <span className={`pill ${row.passed ? 'pill-success' : 'pill-danger'}`} style={{ fontSize: 10, padding: '2px 8px' }}>{row.passed ? 'Passed' : 'Failed'}</span>

@@ -8,11 +8,14 @@ import { supabase, isSupabaseConfigured, type Section, type Question } from '@/l
 /* ------------------------------------------------------------------ */
 
 type Screen = 'identify' | 'welcome' | 'quiz' | 'done' | 'error'
+type ErrorType = 'not_found' | 'expired' | 'generic'
 
 interface AssessmentData {
   title: string
   role: string
+  type: 'scoring' | 'open'
   time_limit: number
+  pass_threshold: number | null
   sections: Section[]
 }
 
@@ -21,6 +24,7 @@ interface SubmissionData {
   token: string
   status: string
   answers: Record<string, unknown>
+  selected_sections: Section[] | null
   assessments: AssessmentData
   candidates: { name: string; email: string }
 }
@@ -64,6 +68,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   const [loading, setLoading] = useState(true)
   const [submission, setSubmission] = useState<SubmissionData | null>(null)
   const [resolvedToken, setResolvedToken] = useState<string>('')
+  const [errorType, setErrorType] = useState<ErrorType>('not_found')
 
   /* --- identify form --- */
   const [identifyName, setIdentifyName] = useState('')
@@ -74,8 +79,46 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /* Toggle body scroll lock when sidebar drawer is open */
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.classList.add('sidebar-open')
+    } else {
+      document.body.classList.remove('sidebar-open')
+    }
+    return () => document.body.classList.remove('sidebar-open')
+  }, [sidebarOpen])
+
+  /* ---------------------------------------------------------------- */
+  /*  Auto-save answers (debounced 2s)                                 */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (screen !== 'quiz' || !submission || submission.id === 'fallback-submission') return
+    if (!isSupabaseConfigured) return
+
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
+    autoSaveRef.current = setTimeout(async () => {
+      try {
+        await supabase
+          .from('submissions')
+          .update({ answers })
+          .eq('id', submission.id)
+      } catch (err) {
+        console.error('Auto-save failed:', err)
+      }
+    }, 2000)
+
+    return () => {
+      if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
+    }
+  }, [answers, screen, submission])
 
   /* ---------------------------------------------------------------- */
   /*  Fetch submission by token                                        */
@@ -95,11 +138,53 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
 
         if (error || !data) throw error
 
+        // If already completed, go straight to done screen
+        if (data.status === 'completed') {
+          setSubmission(data as unknown as SubmissionData)
+          setScreen('done')
+          return
+        }
+
+        // If already expired, show error
+        if (data.status === 'expired') {
+          setErrorType('expired')
+          setScreen('error')
+          return
+        }
+
         setSubmission(data as unknown as SubmissionData)
         setIdentifyName(data.candidates?.name ?? '')
         setIdentifyEmail(data.candidates?.email ?? '')
-        setSecondsLeft((data.assessments?.time_limit ?? 20) * 60)
+
+        const timeLimitSec = (data.assessments?.time_limit ?? 20) * 60
+
+        // If in_progress and started_at exists, calculate remaining time
+        if (data.status === 'in_progress' && data.started_at) {
+          const elapsed = Math.floor((Date.now() - new Date(data.started_at).getTime()) / 1000)
+          const remaining = Math.max(0, timeLimitSec - elapsed)
+          if (remaining <= 0) {
+            // Time already expired — auto-submit
+            setSecondsLeft(0)
+            setAnswers(data.answers ?? {})
+            setScreen('done')
+            // Update submission as completed
+            try {
+              await supabase
+                .from('submissions')
+                .update({ status: 'expired' as const })
+                .eq('id', data.id)
+            } catch { /* best-effort */ }
+            return
+          }
+          setSecondsLeft(remaining)
+          setAnswers(data.answers ?? {})
+          setScreen('quiz')
+          return
+        }
+
+        setSecondsLeft(timeLimitSec)
       } catch {
+        setErrorType('not_found')
         setScreen('error')
       } finally {
         setLoading(false)
@@ -112,10 +197,12 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /*  Derived data                                                     */
   /* ---------------------------------------------------------------- */
 
-  const defaultAssessment: AssessmentData = { title: '', role: '', time_limit: 20, sections: [] }
+  const defaultAssessment: AssessmentData = { title: '', role: '', type: 'scoring', time_limit: 20, pass_threshold: 70, sections: [] }
   const assessment = submission?.assessments ?? defaultAssessment
-  const allQuestions = getAllQuestions(assessment.sections)
-  const totalPoints = getTotalPoints(assessment.sections)
+  // Use selected_sections (randomized per candidate) if available, otherwise fall back to full assessment
+  const activeSections = submission?.selected_sections ?? assessment.sections
+  const allQuestions = getAllQuestions(activeSections)
+  const totalPoints = getTotalPoints(activeSections)
   const totalQuestions = allQuestions.length
   const current = allQuestions[currentIndex]
   const answeredCount = Object.keys(answers).length
@@ -129,32 +216,40 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /* ---------------------------------------------------------------- */
 
   const scoreAndSave = useCallback(async (finalAnswers: Record<string, unknown>) => {
-    const sections = submission?.assessments?.sections ?? []
-    let earned = 0
-    let possible = 0
+    const assessmentType = submission?.assessments?.type ?? 'scoring'
+    const threshold = submission?.assessments?.pass_threshold ?? 70
+    let scorePercent: number | null = null
+    let passed: boolean | null = null
 
-    for (const sec of sections) {
-      for (const q of sec.questions) {
-        possible += q.points
-        const ans = finalAnswers[q.id]
-        if (ans === undefined || ans === null || ans === '') continue
+    if (assessmentType === 'scoring') {
+      // Use selected_sections (randomized) if available, otherwise full assessment
+      const sections = submission?.selected_sections ?? submission?.assessments?.sections ?? []
+      let earned = 0
+      let possible = 0
 
-        if (q.type === 'multiple_choice' && q.correct !== undefined) {
-          if (ans === q.correct) earned += q.points
-        } else if (q.type === 'fill_blank' && q.accepted_answers) {
-          const ansStr = String(ans).trim().toLowerCase()
-          if (q.accepted_answers.some(a => a.toLowerCase() === ansStr)) earned += q.points
-        } else if (q.type === 'ranking' && q.items) {
-          const ansArr = ans as string[]
-          const isCorrect = Array.isArray(ansArr) && ansArr.every((item, i) => item === q.items![i])
-          if (isCorrect) earned += q.points
+      for (const sec of sections) {
+        for (const q of sec.questions) {
+          possible += q.points
+          const ans = finalAnswers[q.id]
+          if (ans === undefined || ans === null || ans === '') continue
+
+          if (q.type === 'multiple_choice' && q.correct !== undefined) {
+            if (ans === q.correct) earned += q.points
+          } else if (q.type === 'fill_blank' && q.accepted_answers) {
+            const ansStr = String(ans).trim().toLowerCase()
+            if (q.accepted_answers.some(a => a.toLowerCase() === ansStr)) earned += q.points
+          } else if (q.type === 'ranking' && q.items) {
+            const ansArr = ans as string[]
+            const isCorrect = Array.isArray(ansArr) && ansArr.every((item, i) => item === q.items![i])
+            if (isCorrect) earned += q.points
+          }
+          // Written questions are not auto-scored
         }
-        // Written questions are not auto-scored
       }
-    }
 
-    const scorePercent = possible > 0 ? Math.round((earned / possible) * 100) : 0
-    const passed = scorePercent >= 70
+      scorePercent = possible > 0 ? Math.round((earned / possible) * 100) : 0
+      passed = scorePercent >= threshold
+    }
 
     // Save to Supabase
     if (isSupabaseConfigured && submission && submission.id !== 'fallback-submission') {
@@ -176,10 +271,12 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   }, [submission])
 
   const handleAutoSubmit = useCallback(() => {
+    if (submitting) return
+    setSubmitting(true)
     if (timerRef.current) clearInterval(timerRef.current)
     scoreAndSave(answers)
     setScreen('done')
-  }, [answers, scoreAndSave])
+  }, [answers, scoreAndSave, submitting])
 
   useEffect(() => {
     if (screen !== 'quiz') return
@@ -245,6 +342,8 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   }
 
   function handleSubmit() {
+    if (submitting) return
+    setSubmitting(true)
     if (timerRef.current) clearInterval(timerRef.current)
     setShowSubmitModal(false)
     scoreAndSave(answers)
@@ -279,27 +378,141 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /* ================================================================ */
 
   if (screen === 'error') {
+    const errorContent: Record<ErrorType, { icon: React.ReactNode; title: string; message: string }> = {
+      not_found: {
+        icon: (
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+        ),
+        title: 'Assessment Not Found',
+        message: 'This assessment link is invalid. Please check the link or contact your recruiter for a new one.',
+      },
+      expired: {
+        icon: (
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        ),
+        title: 'Assessment Expired',
+        message: 'The time limit for this assessment has passed. Please contact your recruiter if you believe this is an error.',
+      },
+      generic: {
+        icon: (
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        ),
+        title: 'Something Went Wrong',
+        message: 'An unexpected error occurred. Please try again or contact your recruiter for assistance.',
+      },
+    }
+    const content = errorContent[errorType]
+
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--offwhite)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
-        <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', borderRadius: 20, padding: '56px 44px', width: '100%', maxWidth: 520, textAlign: 'center' }} className="anim-up">
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
+      <>
+        <style jsx>{`
+          .error-page {
+            min-height: 100vh;
+            background: var(--offwhite);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+          }
+          .error-card {
+            background: var(--white);
+            border: 1px solid var(--border-light);
+            border-radius: 20px;
+            padding: 56px 44px;
+            width: 100%;
+            max-width: 520px;
+            text-align: center;
+          }
+          .error-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: ${errorType === 'expired' ? 'var(--accent-light)' : 'var(--danger-light)'};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+          }
+          .error-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 26px;
+            color: var(--navy);
+            margin-bottom: 8px;
+          }
+          .error-text {
+            font-size: 14px;
+            color: var(--text-mut);
+            line-height: 1.5;
+            margin-bottom: 32px;
+          }
+          .error-help {
+            background: var(--cream);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 28px;
+            text-align: left;
+          }
+          .error-help-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--navy);
+            margin-bottom: 8px;
+          }
+          .error-help-list {
+            font-size: 13px;
+            color: var(--text-sec);
+            line-height: 1.8;
+            padding-left: 16px;
+            margin: 0;
+          }
+          .error-btn {
+            padding: 14px 32px;
+            background: var(--navy);
+            color: var(--offwhite);
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+          }
+          @media (max-width: 768px) {
+            .error-card { padding: 40px 24px; }
+          }
+        `}</style>
+        <div className="error-page">
+          <div className="error-card anim-up">
+            <div className="error-icon">
+              {content.icon}
+            </div>
+            <h1 className="error-title">{content.title}</h1>
+            <p className="error-text">{content.message}</p>
+
+            <div className="error-help">
+              <div className="error-help-title">What you can do:</div>
+              <ul className="error-help-list">
+                <li>Check that the link in your email is complete and correct</li>
+                <li>Contact your recruiter for a new assessment link</li>
+                {errorType === 'expired' && <li>Ask your recruiter if the assessment can be reset</li>}
+              </ul>
+            </div>
+
+            <a href="/" style={{ textDecoration: 'none' }}>
+              <button className="error-btn">Back to Home</button>
+            </a>
           </div>
-          <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26, color: 'var(--navy)', marginBottom: 8 }}>Assessment Not Found</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-mut)', lineHeight: 1.5, marginBottom: 32 }}>
-            This assessment link is invalid or has expired. Please contact your recruiter for a new link.
-          </p>
-          <a href="/" style={{ textDecoration: 'none' }}>
-            <button style={{ padding: '14px 32px', background: 'var(--navy)', color: 'var(--offwhite)', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-              Back to Home
-            </button>
-          </a>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -383,6 +596,11 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
           }
           .identify-btn:hover {
             background: var(--navy-hover);
+          }
+          @media (max-width: 768px) {
+            .identify-card { padding: 36px 24px; }
+            .identify-title { font-size: 22px; }
+            .identify-input { font-size: 16px; }
           }
         `}</style>
 
@@ -534,6 +752,25 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
           .welcome-btn:hover {
             background: var(--navy-hover);
           }
+          @media (max-width: 768px) {
+            .welcome-card { padding: 36px 24px; }
+            .welcome-title { font-size: 22px; }
+            .welcome-stats { grid-template-columns: 1fr; gap: 8px; }
+            .welcome-stat {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 12px 16px;
+              text-align: left;
+            }
+            .welcome-stat-value {
+              font-size: 20px;
+              margin-bottom: 0;
+            }
+            .welcome-stat-label {
+              font-size: 12px;
+            }
+          }
         `}</style>
 
         <div className="welcome-page">
@@ -581,7 +818,26 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
               </div>
             </div>
 
-            <button className="welcome-btn" onClick={() => setScreen('quiz')}>
+            <button
+              className="welcome-btn"
+              onClick={async () => {
+                // Record started_at and mark submission as in_progress
+                if (isSupabaseConfigured && submission && submission.id !== 'fallback-submission') {
+                  try {
+                    await supabase
+                      .from('submissions')
+                      .update({
+                        started_at: new Date().toISOString(),
+                        status: 'in_progress' as const,
+                      })
+                      .eq('id', submission.id)
+                  } catch (err) {
+                    console.error('Failed to record started_at:', err)
+                  }
+                }
+                setScreen('quiz')
+              }}
+            >
               Begin Assessment
             </button>
           </div>
@@ -663,6 +919,11 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
             color: var(--text-mut);
             margin-top: 8px;
           }
+          @media (max-width: 768px) {
+            .done-card { padding: 40px 24px; }
+            .done-title { font-size: 22px; }
+            .done-info { padding: 20px; }
+          }
         `}</style>
 
         <div className="done-page">
@@ -699,7 +960,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
   /* --- Build sidebar section data --- */
   const sidebarSections: { title: string; questions: { id: string; globalIndex: number }[] }[] = []
   let gIdx = 0
-  for (const sec of assessment.sections) {
+  for (const sec of activeSections) {
     const sqs: { id: string; globalIndex: number }[] = []
     for (const q of sec.questions) {
       sqs.push({ id: q.id, globalIndex: gIdx })
@@ -738,6 +999,26 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
           display: flex;
           align-items: center;
           gap: 20px;
+          flex-shrink: 0;
+        }
+        .quiz-topbar-menu {
+          display: none;
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: 1px solid var(--border-light);
+          background: var(--white);
+          color: var(--navy);
+          cursor: pointer;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .quiz-topbar-progress-mobile {
+          display: none;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-sec);
           flex-shrink: 0;
         }
         .quiz-topbar-logo {
@@ -1196,16 +1477,134 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
         .modal-confirm:hover {
           background: var(--navy-hover);
         }
+
+        /* ---- Sidebar backdrop (mobile) ---- */
+        .quiz-sidebar-backdrop {
+          display: none;
+        }
+
+        /* ============================================ */
+        /*  MOBILE RESPONSIVE — 768px                   */
+        /* ============================================ */
+        @media (max-width: 768px) {
+          /* Topbar */
+          .quiz-topbar {
+            height: 52px;
+            padding: 0 16px;
+            gap: 12px;
+          }
+          .quiz-topbar-menu {
+            display: flex;
+          }
+          .quiz-topbar-logo,
+          .quiz-topbar-divider,
+          .quiz-topbar-info,
+          .quiz-topbar-answered {
+            display: none;
+          }
+          .quiz-topbar-progress-mobile {
+            display: block;
+            flex: 1;
+          }
+          .quiz-timer-bar-track {
+            width: 60px;
+          }
+
+          /* Sidebar → Drawer */
+          .quiz-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 260px;
+            z-index: 90;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+            box-shadow: none;
+          }
+          .quiz-sidebar.open {
+            transform: translateX(0);
+            box-shadow: 4px 0 20px rgba(6,5,52,0.12);
+          }
+          .quiz-sidebar-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(6,5,52,0.3);
+            z-index: 80;
+          }
+
+          /* Main content */
+          .quiz-main {
+            padding: 16px;
+          }
+          .quiz-question-card {
+            padding: 20px;
+            border-radius: 16px;
+          }
+
+          /* Inputs — prevent iOS zoom */
+          .fill-input {
+            font-size: 16px;
+          }
+          .written-area {
+            font-size: 16px;
+            min-height: 140px;
+          }
+
+          /* Ranking arrows — bigger touch targets */
+          .ranking-arrow {
+            width: 32px;
+            height: 26px;
+          }
+
+          /* Navigation bar */
+          .quiz-nav {
+            padding: 14px 16px;
+            padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+            gap: 10px;
+          }
+          .quiz-nav-btn {
+            flex: 1;
+            text-align: center;
+            min-height: 44px;
+          }
+
+          /* Submit modal */
+          .modal-card {
+            padding: 28px 24px;
+          }
+          .modal-btns {
+            flex-direction: column;
+          }
+          .modal-cancel,
+          .modal-confirm {
+            width: 100%;
+            min-height: 44px;
+          }
+        }
       `}</style>
 
       <div className="quiz-page">
         {/* ---- Top Bar ---- */}
         <div className="quiz-topbar">
+          {/* Mobile menu button */}
+          <button className="quiz-topbar-menu" onClick={() => setSidebarOpen(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
           <div className="quiz-topbar-logo">HKR.TEAM</div>
           <div className="quiz-topbar-divider" />
           <div className="quiz-topbar-info">
             <div className="quiz-topbar-title">{assessment.title}</div>
             <div className="quiz-topbar-role">{assessment.role}</div>
+          </div>
+          {/* Mobile progress */}
+          <div className="quiz-topbar-progress-mobile">
+            {currentIndex + 1} / {totalQuestions}
           </div>
           <div className="quiz-topbar-answered">
             <strong>{answeredCount}</strong> / {totalQuestions} answered
@@ -1228,8 +1627,12 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
         </div>
 
         <div className="quiz-body">
+          {/* ---- Sidebar backdrop (mobile) ---- */}
+          {sidebarOpen && (
+            <div className="quiz-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+          )}
           {/* ---- Sidebar ---- */}
-          <div className="quiz-sidebar">
+          <div className={`quiz-sidebar${sidebarOpen ? ' open' : ''}`}>
             {sidebarSections.map((sec, si) => (
               <div key={si} className="quiz-sidebar-section">
                 <div className="quiz-sidebar-label">{sec.title}</div>
@@ -1244,7 +1647,7 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
                       <div
                         key={sq.id}
                         className={cls}
-                        onClick={() => goToQuestion(sq.globalIndex)}
+                        onClick={() => { goToQuestion(sq.globalIndex); setSidebarOpen(false) }}
                       >
                         {sq.globalIndex + 1}
                       </div>
@@ -1263,6 +1666,18 @@ export default function AssessPage({ params }: { params: Promise<{ token: string
                 Question {currentIndex + 1} of {totalQuestions}
               </div>
               <div className="quiz-question-text">{q.text}</div>
+
+              {/* --- Question Image --- */}
+              {q.image_url && (
+                <div style={{ margin: '16px 0', textAlign: 'center' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={q.image_url}
+                    alt="Question image"
+                    style={{ maxWidth: '100%', maxHeight: 360, borderRadius: 12, border: '1px solid var(--border-light)' }}
+                  />
+                </div>
+              )}
 
               {/* --- Multiple Choice --- */}
               {q.type === 'multiple_choice' && q.options && (

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { selectQuestionsForSubmission } from '@/lib/question-pool'
 
 type Props = {
   isOpen: boolean
@@ -44,10 +45,32 @@ export default function InviteModal({ isOpen, onClose, assessments }: Props) {
         .single()
       if (candErr) throw candErr
 
-      // Create submission
+      // Fetch assessment to verify it's active and get sections for question pool selection
+      const { data: assessmentData } = await supabase
+        .from('assessments')
+        .select('status, sections')
+        .eq('id', assessmentId)
+        .single()
+
+      if (!assessmentData || assessmentData.status !== 'active') {
+        throw new Error('This assessment is not active. Only active assessments can receive invitations.')
+      }
+
+      // Select random questions if pooling is configured
+      const selectedSections = assessmentData?.sections
+        ? selectQuestionsForSubmission(assessmentData.sections as any)
+        : null
+
+      // Create submission with selected questions
       const { data: submission, error: subErr } = await supabase
         .from('submissions')
-        .insert({ assessment_id: assessmentId, candidate_id: candidate.id, status: 'pending' as const, answers: {} })
+        .insert({
+          assessment_id: assessmentId,
+          candidate_id: candidate.id,
+          status: 'pending' as const,
+          answers: {},
+          selected_sections: selectedSections as any,
+        })
         .select()
         .single()
       if (subErr) throw subErr

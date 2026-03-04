@@ -7,13 +7,20 @@ import { getAccessibleProjectIds } from "@/lib/access";
 import InviteModal from "@/components/admin/InviteModal";
 import GenerateLinkModal from "@/components/admin/GenerateLinkModal";
 
+type SubmissionInfo = {
+  id: string;
+  assessmentTitle: string;
+  status: string;
+  score: number | null;
+};
+
 type CandidateRow = {
   id: string;
   name: string;
   email: string;
   source: "lever" | "manual" | "link";
-  testsCount: number;
-  latestResult: string;
+  submissions: SubmissionInfo[];
+  latestStatus: string;
 };
 
 type AssessmentOption = { id: string; title: string };
@@ -63,24 +70,24 @@ export default function CandidatesPage() {
           }
 
           const mapped: CandidateRow[] = candidateData.map((row: Record<string, unknown>) => {
-            const submissions = (row.submissions ?? []) as Record<string, unknown>[];
-            const latest = submissions[0] as Record<string, unknown> | undefined;
-            const latestAssessment = latest?.assessments as Record<string, unknown> | undefined;
-            let latestResult = "--";
-            if (latest && latestAssessment) {
-              const title = (latestAssessment.title as string) ?? "";
-              const score = latest.score as number | null;
-              const status = latest.status as string;
-              if (score !== null) latestResult = `${title} \u2014 ${score}%`;
-              else latestResult = `${title} \u2014 ${status.replace(/_/g, " ")}`;
-            }
+            const rawSubs = (row.submissions ?? []) as Record<string, unknown>[];
+            const subs: SubmissionInfo[] = rawSubs.map(s => {
+              const assessment = s.assessments as Record<string, unknown> | undefined;
+              return {
+                id: s.id as string,
+                assessmentTitle: (assessment?.title as string) ?? 'Unknown',
+                status: (s.status as string) ?? 'pending',
+                score: (s.score as number | null) ?? null,
+              };
+            });
+            const latest = subs[0];
             return {
               id: row.id as string,
               name: (row.name as string) ?? "Unknown",
               email: (row.email as string) ?? "",
               source: (row.source as CandidateRow["source"]) ?? "manual",
-              testsCount: submissions.length,
-              latestResult,
+              submissions: subs,
+              latestStatus: latest?.status ?? '--',
             };
           });
           setCandidates(mapped);
@@ -142,13 +149,25 @@ export default function CandidatesPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                {["Candidate", "Source", "Tests", "Latest Result"].map((h) => (
+                {["Candidate", "Source", "Assessments", "Status", "Latest Score"].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '14px 20px', fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-mut)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
+              {filtered.map((row) => {
+                const latest = row.submissions[0];
+                const statusPill = (status: string) => {
+                  const map: Record<string, { cls: string; label: string }> = {
+                    completed: { cls: 'pill pill-success', label: 'Completed' },
+                    in_progress: { cls: 'pill pill-accent', label: 'In Progress' },
+                    pending: { cls: 'pill pill-navy', label: 'Pending' },
+                    expired: { cls: 'pill pill-danger', label: 'Expired' },
+                  };
+                  const s = map[status] ?? { cls: 'pill pill-navy', label: status };
+                  return <span className={s.cls}>{s.label}</span>;
+                };
+                return (
                 <tr key={row.id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cream)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -165,13 +184,38 @@ export default function CandidatesPage() {
                   <td style={{ padding: '16px 20px' }}>
                     <span className={row.source === 'lever' ? 'pill pill-success' : row.source === 'link' ? 'pill pill-blue' : 'pill pill-accent'} style={{ textTransform: 'capitalize' }}>{row.source}</span>
                   </td>
-                  <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--text-sec)' }}>{row.testsCount}</td>
-                  <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--text-sec)' }}>{row.latestResult}</td>
+                  <td style={{ padding: '16px 20px' }}>
+                    {row.submissions.length === 0 ? (
+                      <span style={{ fontSize: 13, color: 'var(--text-mut)' }}>--</span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {row.submissions.slice(0, 3).map(sub => (
+                          <div key={sub.id} style={{ fontSize: 13, color: 'var(--text-sec)' }}>
+                            {sub.assessmentTitle}
+                          </div>
+                        ))}
+                        {row.submissions.length > 3 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-mut)' }}>+{row.submissions.length - 3} more</div>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '16px 20px' }}>
+                    {latest ? statusPill(latest.status) : <span style={{ fontSize: 13, color: 'var(--text-mut)' }}>--</span>}
+                  </td>
+                  <td style={{ padding: '16px 20px' }}>
+                    {latest?.score !== null && latest?.score !== undefined ? (
+                      <span style={{ fontSize: 14, fontWeight: 600, color: latest.score >= 70 ? 'var(--success)' : 'var(--danger)' }}>{latest.score}%</span>
+                    ) : (
+                      <span style={{ fontSize: 13, color: 'var(--text-mut)' }}>--</span>
+                    )}
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ padding: '48px 20px', textAlign: 'center', fontSize: 14, color: 'var(--text-mut)' }}>
+                  <td colSpan={5} style={{ padding: '48px 20px', textAlign: 'center', fontSize: 14, color: 'var(--text-mut)' }}>
                     {search ? 'No candidates match your search.' : (
                       <>
                         <p style={{ marginBottom: 16 }}>No candidates yet. Use Invite or Generate Link to add your first candidate.</p>

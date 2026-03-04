@@ -23,25 +23,14 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Protect admin routes — redirect to login if not authenticated
-  if (request.nextUrl.pathname.startsWith('/admin') && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
-
-  // Redirect logged-in users away from login page
-  if (request.nextUrl.pathname === '/login' && user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/admin/dashboard'
-    return NextResponse.redirect(url)
-  }
+  // Refresh the session — this keeps cookies in sync
+  await supabase.auth.getUser()
 
   return supabaseResponse
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/login'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

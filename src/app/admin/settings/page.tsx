@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Profile, UserRole } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 import AddUserModal from '@/components/admin/AddUserModal'
 import EditAssignmentsModal from '@/components/admin/EditAssignmentsModal'
 
@@ -11,6 +12,7 @@ type Tab = 'users' | 'lever'
 const ROLE_LABELS: Record<UserRole, string> = { super_admin: 'Super Admin', admin: 'Admin', user: 'User' }
 
 export default function SettingsPage() {
+  const { profile: currentProfile } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('users')
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +48,10 @@ export default function SettingsPage() {
     fetchProjectMeta()
   }, [])
 
+  const isSelf = (userId: string) => currentProfile?.id === userId
+
   async function handleRoleChange(userId: string, newRole: UserRole) {
+    if (isSelf(userId)) return alert('You cannot change your own role.')
     const prev = users.find(u => u.id === userId)
     setUsers(us => us.map(u => u.id === userId ? { ...u, role: newRole } : u))
 
@@ -65,6 +70,7 @@ export default function SettingsPage() {
   }
 
   async function handleToggleStatus(userId: string) {
+    if (isSelf(userId)) return alert('You cannot deactivate your own account.')
     const user = users.find(u => u.id === userId)
     if (!user) return
     const newStatus = user.status === 'active' ? 'inactive' : 'active'
@@ -196,7 +202,7 @@ export default function SettingsPage() {
                         </div>
                       </td>
                       <td style={{ padding: '14px 20px' }}>
-                        <select className="form-select" style={{ width: 'auto', padding: '6px 30px 6px 12px', fontSize: 13, fontWeight: 500, borderRadius: 8 }} value={user.role} onChange={e => handleRoleChange(user.id, e.target.value as UserRole)}>
+                        <select className="form-select" style={{ width: 'auto', padding: '6px 30px 6px 12px', fontSize: 13, fontWeight: 500, borderRadius: 8, opacity: isSelf(user.id) ? 0.5 : 1 }} value={user.role} onChange={e => handleRoleChange(user.id, e.target.value as UserRole)} disabled={isSelf(user.id)} title={isSelf(user.id) ? 'You cannot change your own role' : ''}>
                           <option value="super_admin">Super Admin</option>
                           <option value="admin">Admin</option>
                           <option value="user">User</option>
@@ -229,7 +235,7 @@ export default function SettingsPage() {
                         )}
                       </td>
                       <td style={{ padding: '14px 20px' }}>
-                        {user.status !== 'pending' && (
+                        {user.status !== 'pending' && !isSelf(user.id) && (
                           <button
                             className="btn btn-sm"
                             style={{
@@ -242,6 +248,9 @@ export default function SettingsPage() {
                           >
                             {user.status === 'active' ? 'Deactivate' : 'Reactivate'}
                           </button>
+                        )}
+                        {isSelf(user.id) && (
+                          <span style={{ fontSize: 11, color: 'var(--text-mut)', fontStyle: 'italic' }}>You</span>
                         )}
                       </td>
                     </tr>
