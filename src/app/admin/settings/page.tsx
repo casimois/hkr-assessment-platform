@@ -126,11 +126,7 @@ export default function SettingsPage() {
 
   return (
     <div className="anim-up">
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Settings</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Manage users, roles, and integrations</p>
-      </div>
+      {/* Title is in topbar */}
 
       {/* Tabs */}
       <div className="tabs">

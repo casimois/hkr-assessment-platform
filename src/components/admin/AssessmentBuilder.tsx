@@ -215,10 +215,6 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
                 </select>
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Description</label>
-              <textarea className="form-textarea" rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description" />
-            </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Project</label>

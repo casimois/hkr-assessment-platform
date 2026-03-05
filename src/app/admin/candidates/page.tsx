@@ -113,22 +113,16 @@ export default function CandidatesPage() {
 
   return (
     <div className="anim-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-        <div>
-          <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26, fontWeight: 400, color: 'var(--navy)', marginBottom: 4 }}>Candidates</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Manage candidates and send assessment invitations.</p>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn btn-secondary" onClick={() => setLinkOpen(true)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Generate Link
-          </button>
-          <button className="btn btn-primary" onClick={() => setInviteOpen(true)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-            Invite
-          </button>
-        </div>
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 24 }}>
+        <button className="btn btn-secondary" onClick={() => setLinkOpen(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Generate Link
+        </button>
+        <button className="btn btn-primary" onClick={() => setInviteOpen(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Invite
+        </button>
       </div>
 
       {/* Search */}
@@ -182,7 +176,7 @@ export default function CandidatesPage() {
                     </div>
                   </td>
                   <td style={{ padding: '16px 20px' }}>
-                    <span className={row.source === 'lever' ? 'pill pill-success' : row.source === 'link' ? 'pill pill-blue' : 'pill pill-accent'} style={{ textTransform: 'capitalize' }}>{row.source}</span>
+                    <span className="pill pill-navy" style={{ textTransform: 'capitalize' }}>{row.source}</span>
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     {row.submissions.length === 0 ? (

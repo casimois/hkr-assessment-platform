@@ -286,7 +286,7 @@ export default function DashboardPage() {
   function statusPill(status: ActivityItem['status'], score?: string) {
     const config: Record<ActivityItem['status'], { cls: string; label: string }> = {
       passed:      { cls: 'pill pill-success', label: `Passed ${score ?? ''}`.trim() },
-      completed:   { cls: 'pill pill-blue',    label: 'Completed' },
+      completed:   { cls: 'pill pill-success',  label: 'Completed' },
       failed:      { cls: 'pill pill-danger',  label: `Failed ${score ?? ''}`.trim() },
       in_progress: { cls: 'pill pill-accent',  label: 'In Progress' },
     }
@@ -301,8 +301,8 @@ export default function DashboardPage() {
   }
 
   function typePill(type: string) {
-    if (type === 'scoring') return <span className="pill pill-purple">Scoring</span>
-    return <span className="pill pill-blue">Open</span>
+    if (type === 'scoring') return <span className="pill pill-navy">Scoring</span>
+    return <span className="pill pill-navy">Open</span>
   }
 
   function completionColor(rate: number): string {
@@ -317,11 +317,7 @@ export default function DashboardPage() {
 
   return (
     <div className="anim-up">
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Dashboard</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Overview of assessment activity and results</p>
-      </div>
+      {/* Spacer (title is in topbar) */}
 
       {/* ═══ Top Stats Row ═══ */}
       <div className="stats-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
@@ -443,7 +439,6 @@ export default function DashboardPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--navy)' }}>{card.title}</span>
-                          {typePill(card.type)}
                           {assessmentStatusPill(card.status)}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text-mut)' }}>

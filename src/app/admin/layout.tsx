@@ -383,7 +383,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           <h2
             style={{
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: 400,
               color: 'var(--text)',
               fontFamily: "'DM Serif Display', serif",

@@ -124,12 +124,8 @@ export default function ProjectsPage() {
 
   return (
     <div className="anim-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Projects</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Organize assessments by client or initiative</p>
-        </div>
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
         <button className="btn btn-primary" onClick={openCreate}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           New Project
@@ -174,8 +170,7 @@ export default function ProjectsPage() {
                     onClick={() => openEdit(project)}
                   >
                     <td style={{ padding: '16px 20px' }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)', marginBottom: 2 }}>{project.name}</div>
-                      {project.description && <div style={{ fontSize: 12, color: 'var(--text-mut)' }}>{project.description}</div>}
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)' }}>{project.name}</div>
                     </td>
                     <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--text-sec)' }}>{project.client ?? <span style={{ color: 'var(--text-mut)' }}>&mdash;</span>}</td>
                     <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--text-sec)' }}>{project.team ?? <span style={{ color: 'var(--text-mut)' }}>&mdash;</span>}</td>

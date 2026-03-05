@@ -110,19 +110,15 @@ export default function AssessmentsPage() {
 
   return (
     <div className="anim-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Assessments</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Create and manage candidate assessments</p>
-        </div>
-        {canManage && (
+      {/* Topbar actions */}
+      {canManage && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
           <Link href="/admin/assessments/new" className="btn btn-primary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             New Assessment
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -178,14 +174,12 @@ export default function AssessmentsPage() {
                   <div style={{ fontSize: 13, color: 'var(--text-mut)', marginTop: 2 }}>{a.role ?? '—'} · {qCount} question{qCount !== 1 ? 's' : ''} · {a.projects?.name ?? '—'}</div>
                 </div>
 
-                {/* Pills */}
+                {/* Pills & actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-                  <span className={`pill ${a.type === 'scoring' ? 'pill-blue' : 'pill-purple'}`}>{a.type === 'scoring' ? 'Scoring' : 'Open'}</span>
                   <span className={`pill ${a.status === 'active' ? 'pill-success' : a.status === 'draft' ? 'pill-accent' : 'pill-navy'}`}>
                     {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
                   </span>
-                  <span className="pill" style={{ background: 'var(--navy)', color: '#fff' }}>{st.sent} sent</span>
-                  {st.avg !== null && <span className="pill pill-blue">{st.avg}% avg</span>}
+                  <span style={{ fontSize: 12, color: 'var(--text-mut)' }}>{st.sent} sent{st.avg !== null && <> · {st.avg}% avg</>}</span>
 
                   {/* Preview */}
                   <button onClick={e => handlePreview(e, a.id)} title="Preview"
@@ -211,7 +205,7 @@ export default function AssessmentsPage() {
                     onMouseEnter={e => { e.currentTarget.style.color = 'var(--navy)'; e.currentTarget.style.borderColor = 'var(--border)' }}
                     onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-mut)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
                   </button>
 
                   {/* Delete */}

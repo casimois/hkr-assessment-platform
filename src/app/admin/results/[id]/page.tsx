@@ -529,7 +529,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span className={`pill ${q.type === 'multiple_choice' ? 'pill-blue' : q.type === 'fill_blank' ? 'pill-accent' : q.type === 'ranking' ? 'pill-purple' : 'pill-navy'}`} style={{ fontSize: 10, padding: '2px 8px' }}>
+                    <span className="pill pill-navy" style={{ fontSize: 10, padding: '2px 8px' }}>
                       {q.type.replace('_', ' ')}
                     </span>
                     {result.correct === true && (
@@ -609,7 +609,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                     />
                     <span style={{ fontSize: 12, color: 'var(--text-mut)' }}>/ {q.points} pts</span>
                     {hasManualScore && (
-                      <span className="pill pill-blue" style={{ fontSize: 10, padding: '2px 8px' }}>Graded</span>
+                      <span className="pill pill-success" style={{ fontSize: 10, padding: '2px 8px' }}>Graded</span>
                     )}
                     {!hasManualScore && answered && (
                       <span style={{ fontSize: 11, color: 'var(--text-mut)', fontStyle: 'italic' }}>Not graded yet</span>

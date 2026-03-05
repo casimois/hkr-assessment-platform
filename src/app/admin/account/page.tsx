@@ -75,10 +75,7 @@ export default function AccountPage() {
 
   return (
     <div className="anim-up" style={{ maxWidth: 600 }}>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Account</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>Manage your profile and security settings</p>
-      </div>
+      {/* Title is in topbar */}
 
       {/* Profile Section */}
       <div className="card card-pad" style={{ marginBottom: 20 }}>

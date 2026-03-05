@@ -17,7 +17,11 @@ type ResultRow = {
   score: number | null;
   passed: boolean | null;
   date: string;
+  rawDate: number;
 };
+
+type SortKey = "score" | "date";
+type SortDir = "asc" | "desc";
 
 function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
@@ -33,6 +37,8 @@ export default function ResultsPage() {
   const [projectFilter, setProjectFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [passFilter, setPassFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
     async function fetchResults() {
@@ -69,6 +75,7 @@ export default function ResultsPage() {
             score: row.score as number | null,
             passed: row.passed as boolean | null,
             date: new Date(row.created_at as string).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            rawDate: new Date(row.created_at as string).getTime(),
           };
         }));
       } catch { /* fallback */ }
@@ -87,6 +94,24 @@ export default function ResultsPage() {
     return true;
   });
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "score") {
+      const aScore = a.score ?? -1;
+      const bScore = b.score ?? -1;
+      return sortDir === "asc" ? aScore - bScore : bScore - aScore;
+    }
+    return sortDir === "asc" ? a.rawDate - b.rawDate : b.rawDate - a.rawDate;
+  });
+
+  function toggleSort(key: SortKey) {
+    if (sortBy === key) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortDir("desc");
+    }
+  }
+
   function handleExport() {
     const header = "Candidate,Email,Assessment,Type,Project,Status,Score,Passed,Date";
     const rows = filtered.map(r => `"${r.candidateName}","${r.candidateEmail}","${r.assessment}","${r.type}","${r.project}","${r.status}",${r.score ?? ""},${r.passed ?? ""},${r.date}`);
@@ -101,18 +126,22 @@ export default function ResultsPage() {
   function statusPillCls(s: string) {
     if (s === 'completed') return 'pill pill-success';
     if (s === 'in_progress') return 'pill pill-accent';
-    if (s === 'expired') return 'pill pill-navy';
+    if (s === 'expired') return 'pill pill-danger';
     return 'pill pill-navy';
+  }
+
+  const thStyle: React.CSSProperties = { textAlign: 'left', padding: '14px 20px', fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-mut)', whiteSpace: 'nowrap' };
+  const sortableThStyle: React.CSSProperties = { ...thStyle, cursor: 'pointer', userSelect: 'none' };
+
+  function sortArrow(key: SortKey) {
+    if (sortBy !== key) return <span style={{ opacity: 0.3, marginLeft: 4 }}>↕</span>;
+    return <span style={{ marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
   return (
     <div className="anim-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-        <div>
-          <h1 style={{ fontSize: 26, color: 'var(--navy)', marginBottom: 4 }}>Results</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-mut)' }}>View and export all assessment submissions.</p>
-        </div>
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
         <button className="btn btn-primary" onClick={handleExport}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
           Export CSV
@@ -143,16 +172,20 @@ export default function ResultsPage() {
       {/* Table */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ minWidth: 900 }}>
+          <table style={{ minWidth: 800 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                {["Candidate", "Assessment", "Type", "Project", "Status", "Score", "Date", ""].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '14px 20px', fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-mut)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
+                <th style={thStyle}>Candidate</th>
+                <th style={thStyle}>Assessment</th>
+                <th style={thStyle}>Project</th>
+                <th style={thStyle}>Status</th>
+                <th style={sortableThStyle} onClick={() => toggleSort("score")}>Score{sortArrow("score")}</th>
+                <th style={sortableThStyle} onClick={() => toggleSort("date")}>Date{sortArrow("date")}</th>
+                <th style={thStyle}></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(row => (
+              {sorted.map(row => (
                 <tr key={row.id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--cream)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -167,17 +200,13 @@ export default function ResultsPage() {
                     </div>
                   </td>
                   <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{row.assessment}</td>
-                  <td style={{ padding: '16px 20px' }}><span className={`pill ${row.type === 'scoring' ? 'pill-blue' : 'pill-purple'}`} style={{ textTransform: 'capitalize' }}>{row.type}</span></td>
                   <td style={{ padding: '16px 20px', fontSize: 14, color: 'var(--text-sec)' }}>{row.project}</td>
                   <td style={{ padding: '16px 20px' }}><span className={statusPillCls(row.status)}>{formatStatus(row.status)}</span></td>
                   <td style={{ padding: '16px 20px' }}>
                     {row.type === 'open' ? (
-                      <span className="pill pill-purple" style={{ fontSize: 10, padding: '2px 8px' }}>Open</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-mut)' }}>—</span>
                     ) : row.score !== null ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 500, color: row.passed ? 'var(--success)' : 'var(--danger)' }}>{row.score}%</span>
-                        <span className={`pill ${row.passed ? 'pill-success' : 'pill-danger'}`} style={{ fontSize: 10, padding: '2px 8px' }}>{row.passed ? 'Passed' : 'Failed'}</span>
-                      </div>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600, color: row.passed ? 'var(--success)' : 'var(--danger)' }}>{row.score}%</span>
                     ) : (
                       <span style={{ fontSize: 13, color: 'var(--text-mut)' }}>--</span>
                     )}
@@ -188,8 +217,8 @@ export default function ResultsPage() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={8} style={{ padding: '48px 20px', textAlign: 'center', fontSize: 14, color: 'var(--text-mut)' }}>No results match your filters.</td></tr>
+              {sorted.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: '48px 20px', textAlign: 'center', fontSize: 14, color: 'var(--text-mut)' }}>No results match your filters.</td></tr>
               )}
             </tbody>
           </table>

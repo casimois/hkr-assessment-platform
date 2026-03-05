@@ -129,11 +129,6 @@ export default function ProjectModal({ isOpen, onClose, onSave, onDelete, projec
               <input className="form-input" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Summer Hiring 2025" required autoFocus />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Description</label>
-              <textarea className="form-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the project..." rows={2} style={{ resize: 'vertical' }} />
-            </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Client</label>
