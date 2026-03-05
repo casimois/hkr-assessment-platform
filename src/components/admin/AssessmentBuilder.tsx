@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, isSupabaseConfigured, Assessment, Section, Question } from '@/lib/supabase'
-import { countPoolable } from '@/lib/question-pool'
+import { countPoolable, selectQuestionsForSubmission } from '@/lib/question-pool'
+import { useAuth } from '@/lib/auth'
 import QuestionEditor from './QuestionEditor'
 
 type Props = { existingAssessment?: Assessment }
@@ -29,6 +30,7 @@ function newQuestion(type: Question['type']): Question {
 
 export default function AssessmentBuilder({ existingAssessment }: Props) {
   const router = useRouter()
+  const { profile } = useAuth()
   const [title, setTitle] = useState(existingAssessment?.title ?? '')
   const [type, setType] = useState<'scoring' | 'open'>(existingAssessment?.type ?? 'scoring')
   const [description, setDescription] = useState(existingAssessment?.description ?? '')
@@ -46,6 +48,7 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
   })
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
+  const [tryingTest, setTryingTest] = useState(false)
   const [addingTo, setAddingTo] = useState<number | null>(null)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
@@ -149,6 +152,51 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
     }
   }
 
+  const handleTryMyself = async () => {
+    if (!existingAssessment || !isSupabaseConfigured || !profile) return
+    const errors = validateAssessment()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    setTryingTest(true)
+    try {
+      // Upsert a candidate record for the current admin user
+      const { data: candidate, error: candErr } = await supabase
+        .from('candidates')
+        .upsert({ name: profile.full_name || 'Admin', email: profile.email, source: 'manual' as const }, { onConflict: 'email' })
+        .select()
+        .single()
+      if (candErr) throw candErr
+
+      // Select random questions if pooling is configured
+      const selectedSections = selectQuestionsForSubmission(sections)
+
+      // Create a submission
+      const { data: submission, error: subErr } = await supabase
+        .from('submissions')
+        .insert({
+          assessment_id: existingAssessment.id,
+          candidate_id: candidate.id,
+          status: 'pending' as const,
+          answers: {},
+          selected_sections: selectedSections as unknown as Record<string, unknown>,
+        })
+        .select()
+        .single()
+      if (subErr) throw subErr
+
+      // Open the assessment link in a new tab
+      window.open(`/assess/${submission.token}`, '_blank')
+    } catch (err) {
+      console.error('Try myself error:', err)
+      alert('Failed to generate test link. Make sure the assessment is saved first.')
+    } finally {
+      setTryingTest(false)
+    }
+  }
+
   const updateSection = (idx: number, partial: Partial<Section>) => {
     setSections(prev => prev.map((s, i) => i === idx ? { ...s, ...partial } : s))
   }
@@ -177,6 +225,11 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
     <div>
       {/* Top actions */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 20 }}>
+        {existingAssessment && (
+          <button className="btn btn-secondary btn-sm" onClick={handleTryMyself} disabled={tryingTest} title="Take this assessment yourself in a new tab">
+            {tryingTest ? 'Generating...' : 'Try it myself'}
+          </button>
+        )}
         <button className="btn btn-secondary btn-sm" onClick={() => router.push('/admin/assessments')}>Cancel</button>
         <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : '💾 Save'}
@@ -228,15 +281,17 @@ export default function AssessmentBuilder({ existingAssessment }: Props) {
                 <input className="form-input" value={role} onChange={e => setRole(e.target.value)} placeholder="e.g. Project Manager" />
               </div>
             </div>
-            <div className="form-row-3">
+            <div className={type === 'scoring' ? 'form-row-3' : 'form-row'}>
               <div className="form-group">
                 <label className="form-label">Time Limit (min)</label>
                 <input className="form-input" type="number" value={timeLimit} onChange={e => setTimeLimit(Number(e.target.value))} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Pass Threshold (%)</label>
-                <input className="form-input" type="number" value={passThreshold} onChange={e => setPassThreshold(Number(e.target.value))} disabled={type !== 'scoring'} />
-              </div>
+              {type === 'scoring' && (
+                <div className="form-group">
+                  <label className="form-label">Pass Threshold (%)</label>
+                  <input className="form-input" type="number" value={passThreshold} onChange={e => setPassThreshold(Number(e.target.value))} />
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">Status</label>
                 <select className="form-select" value={status} onChange={e => setStatus(e.target.value as 'active' | 'draft' | 'archived')}>
