@@ -74,11 +74,6 @@ export default function AssessmentsPage() {
     return true
   })
 
-  function handleCopy(e: React.MouseEvent, id: string) {
-    e.preventDefault(); e.stopPropagation()
-    navigator.clipboard.writeText(`${window.location.origin}/assess/${id}`)
-  }
-
   function handlePreview(e: React.MouseEvent, id: string) {
     e.preventDefault(); e.stopPropagation()
     window.open(`/admin/assessments/${id}/preview`, '_blank')
@@ -198,15 +193,6 @@ export default function AssessmentsPage() {
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16H2V4a2 2 0 012-2h12v2" /></svg>
                   </button>}
-
-                  {/* Copy Link */}
-                  <button onClick={e => handleCopy(e, a.id)} title="Copy link"
-                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border-light)', background: 'var(--white)', color: 'var(--text-mut)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}
-                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--navy)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-mut)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                  </button>
 
                   {/* Delete */}
                   {canManage && <button onClick={e => handleDelete(e, a.id)} title="Delete"
